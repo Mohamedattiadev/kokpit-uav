@@ -1,0 +1,35 @@
+# Kokpit ArduCopter Baseline Parameters (Pixhawk 2.4.8 / ArduCopter 4.5+)
+# MissionPlanner: Full Parameter List -> Load from file
+# Format: NAME,VALUE  (her satır)
+# Yorumlar # ile başlar; MissionPlanner bunları atlamaz, "Compare" ile kontrol et.
+
+# --- Frame / motor (ZD550 quad X) ---
+FRAME_CLASS,1
+FRAME_TYPE,1
+MOT_PWM_MIN,1000
+MOT_PWM_MAX,2000
+MOT_SPIN_ARM,0.10
+MOT_SPIN_MIN,0.15
+MOT_THST_HOVER,0.35
+
+# --- EKF3 (lidar destekli) ---
+AHRS_EKF_TYPE,3
+EK3_ENABLE,1
+EK2_ENABLE,0
+EK3_GPS_TYPE,0
+EK3_SRC1_POSXY,3
+EK3_SRC1_VELXY,3
+EK3_SRC1_POSZ,2
+EK3_SRC1_VELZ,3
+EK3_SRC1_YAW,1
+EK3_RNG_USE_HGT,70
+
+# --- Sensors ---
+COMPASS_ENABLE,1
+COMPASS_USE,1
+COMPASS_USE2,1
+COMPASS_USE3,0
+
+# --- RC ---
+RC_PROTOCOLS,1
+RC8_OPTION,0

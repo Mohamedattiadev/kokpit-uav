@@ -28,11 +28,16 @@ RIGHT_SIGN = 1.0  # offset_right_m -> sağ hız işareti
 
 class PrecisionApproach:
     def __init__(self, drone: DroneController, detector: ArucoDetector, camera,
-                 abort_check=None):
+                 abort_check=None, *, precland_complement: bool = True):
+        """precland_complement=True iken her tespit sonrası ArduCopter'a
+        LANDING_TARGET MAVLink mesajı da gönderilir (PRECLAND yerleşik
+        Kalman'ı ile custom PID paralel çalışır). Rapor "Visual Servoing
+        PID" taahhüdüne uyumlu — PID primary, PRECLAND complement."""
         self.drone = drone
         self.detector = detector
         self.camera = camera
         self.abort_check = abort_check or (lambda: False)
+        self.precland_complement = precland_complement
         p = CFG.pid
         self.pid_fwd = PID(p.kp_xy, p.ki_xy, p.kd_xy,
                            output_limit=p.max_xy_speed_ms,
@@ -104,6 +109,16 @@ class PrecisionApproach:
             lost_frames = 0
             err_fwd, err_right = self._errors(det)
             horiz_err = math.hypot(err_fwd, err_right)
+
+            # PRECLAND complement — Pixhawk yerleşik Kalman'a da besle
+            if self.precland_complement and det.distance_m > 0.05:
+                try:
+                    ax = math.atan2(det.offset_right_m, det.distance_m)
+                    ay = math.atan2(det.offset_fwd_m, det.distance_m)
+                    self.drone.send_landing_target(
+                        ax, ay, det.distance_m)
+                except Exception:
+                    pass   # PRECLAND opsiyonel, hata custom PID'i durdurmasın
 
             v_fwd = self.pid_fwd.update(err_fwd, dt)
             v_right = self.pid_right.update(err_right, dt)

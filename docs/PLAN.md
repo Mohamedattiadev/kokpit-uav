@@ -208,10 +208,45 @@
 ## İzleme
 
 Tamamlanan görevler bu dosyada checkbox'lanır:
-- [ ] Sprint 0
-- [ ] Sprint 1
-- [ ] Sprint 2
-- [ ] Sprint 3
-- [ ] Sprint 4
+- [x] Sprint 0 (bug fix — TAMAM)
+- [x] Sprint 1 (uçuş güvenliği — büyük ölçüde TAMAM, donanım test bekliyor)
+- [x] Sprint 2 (rapor uyumu — TAMAM, gerçek Jetson tuning bekliyor)
+- [ ] Sprint 3 (operasyon kalitesi — kısmen)
+- [ ] Sprint 4 (saha hazırlığı — donanım gerekir)
 
 Bloker / risk → `docs/QUESTIONS_FOR_TEAM.md`'ye yaz, takım toplantısında çöz.
+
+## Yapılan İşler Özeti (en son commit)
+
+Takım yarışma raporunu temel alarak tüm recommended kararları uyguladı.
+Detay `docs/QUESTIONS_FOR_TEAM.md` içinde. Özet:
+
+**Kod değişiklikleri (Sprint 0+1+2):**
+- LoRa protokol v2: 32-bit seq + AES-128-CCM + SHA-256 + chunk reassembly + replay protection + boot beacon
+- Yüz görüntüsü chunk'lı LoRa iletimi (FACE_IMAGE_BEGIN + N×CHUNK) — rapor uyumu
+- ESP32 ground station yeniden yazıldı (OV5640 capture + NVS persistent seq + mbedTLS)
+- ESP32 packet_protocol.h C tarafı yeni şema
+- Failsafe priority queue (USER_ABORT > CRASH > BATTERY_CRT > LINK_LOST > ...)
+- Crash detection (45° tilt veya 3g spike → force disarm + servo lock)
+- Servo 6-katmanlı guard (phase + face + marker + altitude + ACK + tilt)
+- MAVLink stream rate'ler (ATTITUDE@20Hz, RANGEFINDER@10Hz, RAW_IMU@20Hz)
+- RANGEFINDER + ATTITUDE + RAW_IMU subscribe (lidar + IMU telemetri)
+- `EKF_ATTITUDE` literal bit fix
+- Yaw mask `IGNORE_YAW` ekleme (drone N'e dönmüyor artık)
+- `mission_start` None-safe fix
+- `set_servo()` ACK + 3 retry
+- `enroll_from_jpeg()` (LoRa yüz JPEG → referans embedding)
+- PRECLAND complement: `send_landing_target()` + `kokpit_precland.param`
+- 7 ArduCopter parametre dosyası baseline (`ardupilot/*.param`)
+- Geofence runtime upload `setup_geofence()`
+- Battery voltage failsafe (% yerine V tabanlı)
+- Test'ler v2'ye güncellendi + replay/SHA tamper/chunk reassembly testleri eklendi
+
+**TODO (gerçek donanım gelince):**
+- TensorRT ArcFace engine build (`tools/build_face_trt.py`)
+- Kamera kalibrasyon (`tools/calibrate_camera.py` zaten var, çalıştırılacak)
+- Lidar/kamera extrinsics ölçümü (`onboard/configs/extrinsics.yaml`)
+- PID gain tuning (`tools/tune_pid.py` opsiyonel)
+- ArduCopter AUTOTUNE
+- Geofence GPS köşeleri
+- Saha test uçuşları

@@ -166,6 +166,9 @@ class DropperConfig:
     pwm_locked: int = 1100             # kilitli (paket tutuluyor)
     pwm_released: int = 1900           # açık (paket bırakıldı)
     actuation_time_s: float = 1.5      # servonun hareketi tamamlaması için bekleme
+    # Servo guard'ları (Sprint 1 P0.3)
+    min_drop_altitude_m: float = 1.0   # bu seviyenin altında bırakma yasak
+    max_drop_altitude_m: float = 2.5   # bu seviyenin üstünde bırakma yasak
 
 
 # =============================================================================
@@ -175,7 +178,8 @@ class DropperConfig:
 class SafetyConfig:
     # Batarya (rapor: kritik eşikte görevi iptal et, RTL)
     battery_warn_voltage: float = 21.6     # 6S ~3.6V/hücre
-    battery_critical_voltage: float = 20.4 # 6S ~3.4V/hücre -> RTL
+    battery_low_voltage: float = 22.0      # 6S ~3.67V/hücre -> RTL trigger
+    battery_critical_voltage: float = 21.0 # 6S ~3.50V/hücre -> LAND trigger
     battery_min_percent: float = 20.0
 
     # GPS

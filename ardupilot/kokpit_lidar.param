@@ -1,0 +1,7 @@
+# Benewake TFS20 lidar — MAVLink rangefinder (Jetson aracılığıyla)
+# Jetson DISTANCE_SENSOR mesajı gönderir; ArduCopter rangefinder olarak kullanır.
+RNGFND1_TYPE,10
+RNGFND1_ORIENT,25
+RNGFND1_MIN_CM,10
+RNGFND1_MAX_CM,1500
+RNGFND1_GNDCLEAR,15

@@ -16,6 +16,8 @@ görevi güvenle sonlandırır (RTL/LAND). "Safety First" — drone düşmesin.
 SITL'de uçtan uca otomatik test için: simulation/test_mission_sitl.py
 """
 from __future__ import annotations
+import heapq
+import math
 import threading
 import time
 from typing import Optional
@@ -30,6 +32,7 @@ from visual_servo import PrecisionApproach
 from autonomous_takeoff import autonomous_takeoff
 from state_machine import StateMachine, MissionState
 from packet_protocol import DeliveryRequest
+from lora_receiver import FaceDelivery
 
 
 class Mission:
@@ -47,11 +50,19 @@ class Mission:
         self.fsm = StateMachine()
         self.target: Optional[DeliveryRequest] = None
         self.package_delivered = False   # görev boyunca kalıcı teslimat kaydı
+        # Servo guard'ları için durum bayrakları
+        self.face_verified: bool = False
+        self.marker_locked: bool = False
 
         self._abort = False
         self._abort_reason = ""
         self._monitor_running = False
         self._monitor_thread: Optional[threading.Thread] = None
+        # Failsafe priority queue — aynı anda birden fazla failsafe varsa
+        # en yüksek priority kazanır. Sprint 1 P0.2.
+        self._failsafe_heap: list[tuple[int, float, str, str]] = []
+        self._failsafe_lock = threading.Lock()
+        self._cancel_event = threading.Event()   # phase task cancellation
 
     # =====================================================================
     # Kurulum
@@ -87,23 +98,90 @@ class Mission:
             target=self._failsafe_loop, daemon=True)
         self._monitor_thread.start()
 
+    # Failsafe priority sabitleri (yüksek değer = yüksek öncelik)
+    PRIO_USER_ABORT = 100
+    PRIO_CRASH = 95
+    PRIO_BATTERY_CRT = 90
+    PRIO_LINK_LOST = 80
+    PRIO_BATTERY_LOW = 70
+    PRIO_GPS_LOST = 60
+    PRIO_GEOFENCE = 30
+
     def _failsafe_loop(self):
         s = CFG.safety
+        # Crash detection için debounce sayaçları
+        tilt_count = 0
+        accel_spike_count = 0
         while self._monitor_running:
             t = self.drone.telemetry()
-            reason = None
+            # 1) CRASH detection — roll/pitch 45° veya |az| > 3g (debounced)
+            if t.armed:
+                tilt_deg = max(abs(math.degrees(t.roll)),
+                               abs(math.degrees(t.pitch)))
+                if tilt_deg > 45:
+                    tilt_count += 1
+                else:
+                    tilt_count = 0
+                if abs(t.accel_z_g) > 3.0:
+                    accel_spike_count += 1
+                else:
+                    accel_spike_count = 0
+                if tilt_count >= 3 or accel_spike_count >= 3:
+                    self._push_failsafe(
+                        self.PRIO_CRASH, "CRASH",
+                        f"Devrilme: tilt={tilt_deg:.0f}° az={t.accel_z_g:.1f}g")
+                    # Acil kilit: servo kapalı + force disarm
+                    try:
+                        if self.dropper:
+                            self.dropper.lock()
+                        self.drone.force_disarm()
+                    except Exception as e:
+                        print(f"[CRASH] disarm hatası: {e}")
+            # 2) MAVLink link
             if not self.drone.link_alive() and t.last_heartbeat > 0:
-                reason = "MAVLink link kaybı"
-            elif t.battery_voltage > 0 and t.battery_voltage < s.battery_critical_voltage:
-                reason = f"Kritik batarya {t.battery_voltage:.1f}V"
-            elif (self.drone.home_lat is not None and t.lat != 0 and
-                  self._dist_from_home(t) > s.geofence_radius_m):
-                reason = "Geofence yarıçapı aşıldı"
+                self._push_failsafe(self.PRIO_LINK_LOST, "LINK_LOST",
+                                    "MAVLink heartbeat kaybı")
+            # 3) Batarya voltaj-tabanlı (% güvenilmez)
+            if t.battery_voltage > 0:
+                if t.battery_voltage < s.battery_critical_voltage:
+                    self._push_failsafe(
+                        self.PRIO_BATTERY_CRT, "BATTERY_CRT",
+                        f"Kritik batarya {t.battery_voltage:.2f}V")
+                elif t.battery_voltage < getattr(
+                        s, "battery_low_voltage", s.battery_critical_voltage + 1.0):
+                    self._push_failsafe(
+                        self.PRIO_BATTERY_LOW, "BATTERY_LOW",
+                        f"Düşük batarya {t.battery_voltage:.2f}V")
+            # 4) GPS kayıp
+            if t.armed and t.fix_type < 3:
+                self._push_failsafe(self.PRIO_GPS_LOST, "GPS_LOST",
+                                    f"GPS fix kaybı (fix={t.fix_type})")
+            # 5) Geofence (Jetson içi backup — ArduCopter ana koruma)
+            if (self.drone.home_lat is not None and t.lat != 0 and
+                    self._dist_from_home(t) > s.geofence_radius_m):
+                self._push_failsafe(self.PRIO_GEOFENCE, "GEOFENCE",
+                                    "Geofence yarıçapı aşıldı")
             elif t.alt_rel > s.geofence_max_alt_m + 2:
-                reason = f"Geofence irtifa aşıldı ({t.alt_rel:.0f}m)"
-            if reason and not self._abort:
-                self.request_abort(reason)
-            time.sleep(0.5)
+                self._push_failsafe(self.PRIO_GEOFENCE, "GEOFENCE",
+                                    f"Geofence irtifa aşıldı ({t.alt_rel:.0f}m)")
+            # En yüksek öncelikli failsafe'i işle
+            self._consume_failsafes()
+            time.sleep(0.2)
+
+    def _push_failsafe(self, priority: int, kind: str, reason: str):
+        with self._failsafe_lock:
+            # heapq min-heap olduğu için priority'yi negatif sakla
+            heapq.heappush(self._failsafe_heap,
+                           (-priority, time.time(), kind, reason))
+
+    def _consume_failsafes(self):
+        with self._failsafe_lock:
+            if not self._failsafe_heap:
+                return
+            _, _, kind, reason = self._failsafe_heap[0]
+            self._failsafe_heap.clear()
+        if not self._abort:
+            self.request_abort(f"[{kind}] {reason}")
 
     def _dist_from_home(self, t) -> float:
         from mavlink_interface import haversine_m
@@ -112,6 +190,7 @@ class Mission:
     def request_abort(self, reason: str):
         self._abort = True
         self._abort_reason = reason
+        self._cancel_event.set()   # blocking loop'lar bunu polluyor
         print(f"[FAILSAFE] !!! ABORT: {reason}")
 
     def abort_check(self) -> bool:
@@ -126,7 +205,7 @@ class Mission:
     # =====================================================================
     def run(self) -> bool:
         self.fsm.transition(MissionState.WAIT_PACKET)
-        mission_start = None
+        mission_start: Optional[float] = None
         try:
             while not self.fsm.is_terminal():
                 st = self.fsm.state
@@ -138,7 +217,9 @@ class Mission:
                     self.fsm.transition(MissionState.ABORT, force=True)
                     continue
 
-                if (mission_start and
+                # mission_start None-safe (WAIT_PACKET FAILED branch'inde set
+                # edilmeden çıkılabilir; o durumda timeout devre dışı kalır)
+                if (mission_start is not None and
                         time.time() - mission_start > CFG.safety.overall_mission_timeout_s
                         and st not in (MissionState.RETURN_HOME, MissionState.LANDING,
                                        MissionState.DISARM, MissionState.ABORT)):
@@ -148,7 +229,9 @@ class Mission:
 
                 if st == MissionState.WAIT_PACKET:
                     self._do_wait_packet()
-                    mission_start = time.time()
+                    # Sadece görev gerçekten başladıysa zamanlayıcı başlasın
+                    if self.fsm.state == MissionState.TAKEOFF:
+                        mission_start = time.time()
                 elif st == MissionState.TAKEOFF:
                     self._do_takeoff()
                 elif st == MissionState.NAVIGATE:
@@ -183,11 +266,26 @@ class Mission:
     # =====================================================================
     def _do_wait_packet(self):
         print("[GÖREV] Yer istasyonundan teslimat talebi bekleniyor...")
-        req = self.lora.wait_for_delivery(timeout=None)
-        if req is None:
+        item = self.lora.wait_for_delivery(timeout=None)
+        if item is None:
             self.fsm.transition(MissionState.FAILED, force=True)
             return
-        self.target = req
+        # Yeni mod: FaceDelivery (GPS + JPEG). Legacy: DeliveryRequest.
+        if isinstance(item, FaceDelivery):
+            self.target = item.gps
+            # Referans yüzü verifier'a enroll et
+            try:
+                ok = self.verifier.enroll_from_jpeg(item.jpeg, recipient_id=0)
+                if not ok:
+                    print("[GÖREV] HATA: gelen yüz görüntüsü enroll edilemedi")
+                    self.fsm.transition(MissionState.FAILED, force=True)
+                    return
+            except Exception as e:
+                print(f"[GÖREV] Yüz enroll hatası: {e}")
+                self.fsm.transition(MissionState.FAILED, force=True)
+                return
+        else:
+            self.target = item
         self.fsm.transition(MissionState.TAKEOFF)
 
     def _do_takeoff(self):
@@ -250,8 +348,10 @@ class Mission:
         pa = PrecisionApproach(self.drone, self.detector, self.camera,
                                abort_check=self.abort_check)
         if pa.run(CFG.flight.drop_altitude_m):
+            self.marker_locked = True   # servo guard için
             self.fsm.transition(MissionState.BIOMETRIC_VERIFY)
         else:
+            self.marker_locked = False
             if self.abort_check():
                 return
             print("[GÖREV] Hassas yaklaşma başarısız -> üsse dönüş")
@@ -265,14 +365,24 @@ class Mission:
         res = self.verifier.verify_with_voting(self.target.recipient_id, self.camera)
         if res.matched:
             print(f"[GÖREV] Kimlik DOĞRULANDI (güven {res.confidence:.2f})")
+            self.face_verified = True   # servo guard için
             self.fsm.transition(MissionState.DROP_PACKAGE)
         else:
+            self.face_verified = False
             print("[GÖREV] Kimlik doğrulanamadı -> teslimat ASKIYA alındı, üsse dönüş")
             self.fsm.transition(MissionState.RETURN_HOME, force=True)
 
     def _do_drop(self):
         self.drone.send_velocity_body(0, 0, 0)
-        self.dropper.drop()
+        ok = self.dropper.drop(
+            phase_ok=(self.fsm.state == MissionState.DROP_PACKAGE),
+            face_verified=self.face_verified,
+            marker_locked=self.marker_locked,
+        )
+        if not ok:
+            print("[GÖREV] Servo guard reddetti -> üsse dönüş")
+            self.fsm.transition(MissionState.RETURN_HOME, force=True)
+            return
         self.package_delivered = True
         # Bırakıştan sonra biraz yüksel (güvenli RTL için)
         print("[GÖREV] Bırakış sonrası yükseliyor")

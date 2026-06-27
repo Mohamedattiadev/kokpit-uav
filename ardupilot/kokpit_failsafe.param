@@ -1,0 +1,32 @@
+# Failsafe paramları — pilot priority + batarya + link + RC
+# 6S LiPo (22.2V nominal): low=22.0V (~3.67V/cell), crit=21.0V (~3.50V/cell)
+
+# Batarya
+BATT_MONITOR,4
+BATT_CAPACITY,7000
+BATT_LOW_VOLT,22.0
+BATT_CRT_VOLT,21.0
+BATT_LOW_TIMER,10
+BATT_FS_LOW_ACT,2
+BATT_FS_CRT_ACT,1
+
+# RC kayıp → RTL (pilot priority korunur)
+FS_THR_ENABLE,1
+FS_THR_VALUE,950
+
+# GCS / MAVLink kayıp
+FS_GCS_ENABLE,1
+FS_GCS_TIMEOUT,5
+
+# EKF failsafe
+FS_EKF_ACTION,1
+FS_EKF_THRESH,0.8
+
+# Crash check
+FS_CRASH_CHECK,1
+
+# Arm gereksinimleri
+ARMING_CHECK,1
+
+# RC8 manuel override (pilot mod değiştirme) — script asla override etmemeli
+RC_OPTIONS,0

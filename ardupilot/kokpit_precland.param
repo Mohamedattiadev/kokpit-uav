@@ -1,0 +1,10 @@
+# PRECLAND — yerleşik hassas iniş (LANDING_TARGET MAVLink mesajı ile)
+# Jetson aruco_servoing modülü mavlink_interface.send_landing_target() çağırır
+PLND_ENABLED,1
+PLND_TYPE,1
+PLND_EST_TYPE,1
+PLND_BUS,-1
+PLND_LAG,0.02
+PLND_XY_DIST_MAX,2.5
+PLND_STRICT,1
+PLND_OPTIONS,0

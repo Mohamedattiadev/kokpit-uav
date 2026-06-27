@@ -161,6 +161,26 @@ class FaceVerifier:
     def verify_frame(self, recipient_id: int, frame) -> VerifyResult:
         return self.backend.verify(recipient_id, frame)
 
+    def enroll_from_jpeg(self, jpeg_bytes: bytes,
+                         recipient_id: int = 0) -> bool:
+        """LoRa'dan gelen JPEG bayt dizisini decode et + enroll et.
+
+        Sprint 2 P1.2 — yer istasyonu yüz görüntüsünü gönderdiğinde drone tek
+        atımda referans embedding'i çıkarır."""
+        import numpy as np
+        arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            print("[YÜZ] enroll_from_jpeg: JPEG decode edilemedi")
+            return False
+        if self.backend.enroll(recipient_id, img):
+            if recipient_id not in self.enrolled:
+                self.enrolled.append(recipient_id)
+            print(f"[YÜZ] LoRa'dan enroll OK: recipient_id={recipient_id}")
+            return True
+        print("[YÜZ] enroll_from_jpeg: yüz bulunamadı")
+        return False
+
     def verify_with_voting(self, recipient_id: int, camera,
                            on_frame=None) -> VerifyResult:
         """Birden çok kare topla, oyla. votes_needed_to_pass eşleşme -> PASS."""

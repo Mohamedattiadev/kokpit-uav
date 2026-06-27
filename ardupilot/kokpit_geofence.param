@@ -1,0 +1,10 @@
+# Geofence — pilot priority + RTL on breach
+# Polygon ayrıca MissionPlanner/QGC ile yüklenir (ardupilot/kokpit_arena.poly).
+# Jetson mavlink_interface.setup_geofence() de bu paramları runtime'da yazar.
+FENCE_ENABLE,1
+FENCE_TYPE,7
+FENCE_ACTION,1
+FENCE_RADIUS,200
+FENCE_ALT_MAX,50
+FENCE_ALT_MIN,-5
+FENCE_MARGIN,2

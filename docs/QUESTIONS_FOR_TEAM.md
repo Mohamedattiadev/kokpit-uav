@@ -1,165 +1,138 @@
-# QUESTIONS_FOR_TEAM.md — Karar Bekleyen Sorular
+# QUESTIONS_FOR_TEAM.md — Takım Kararları
 
-> Bu sorular `docs/PLAN.md` sprint'lerini başlatmadan önce takımca cevaplanmalı. Cevaplar bu dosyaya işlenecek, sonra plan kesinleşecek.
-
----
-
-## 🔴 BLOCKING — Cevap Olmadan İlerlenemez
-
-### Q1 — Yüz Görüntüsü Transferi (rapor uyumu)
-**Soru:** Yarışma raporumuz "Face Image Capture → packet → drone" diyor. Mevcut kod sadece `recipient_id` gönderiyor, gerçek görüntü değil.
-- (a) ✅ Rapora uyalım: LoRa'dan 160×160 grayscale Q65 JPEG (~4 KB) chunk'lı gönder (5 sn iletim)
-- (b) ⚠️ `recipient_id` ile devam et + raporu güncelle/jüriye açıkla
-- (c) ✅ Hibrit: ikisi de desteklensin, config flag ile seç
-
-**Cevap:**
+> Takım kararı: **resmi yarışma raporuna sadık kalınacak**. Her soru için
+> rapor uyumlu recommended seçenek alındı ve kod tarafına uygulandı. Bu
+> dosya kararların gerekçesini ve mevcut durumu listeler.
 
 ---
 
-### Q2 — LoRa Güvenlik Kapsamı
-**Soru:** LoRa şu an plaintext + CRC + 8-bit seq. 433 MHz menzilindeki herkes sahte tetik gönderebilir / replay yapabilir.
-- (a) ✅ AES-128-CCM + 32-bit persistent seq + SHA-256 payload hash (önerilen — 2 gün)
-- (b) ⚠️ Sadece HMAC-SHA256 + seq (integrity ama gizlilik yok — 1 gün)
-- (c) ❌ Mevcut korumayı koru (yarışma kapsamı için kabul edilebilir bul)
+## Karar Verilmiş — Recommended (rapor uyumlu)
 
-**Cevap:**
+### Q1 — Yüz Görüntüsü Transferi → **(a) JPEG transfer**
+**Gerekçe:** Rapor 3.3.1.1 açıkça "FACE IMAGE CAPTURE → packet → drone" diyor. `recipient_id`-only yaklaşımı bu taahhüde uymaz.
 
----
-
-### Q3 — Yarışma Alanı GPS Köşeleri
-**Soru:** Geofence için yarışma sahasının 4–6 köşesinin GPS koordinatları gerekiyor.
-- Saha henüz duyurulmadı mı? (Beklenecek)
-- Duyuruldu mu? (Koordinatları paylaş, `ardupilot/kokpit_arena.poly` üretilecek)
-
-**Cevap (lat, lon × 4-6):**
+**Uygulama (Sprint 2 P1.2 — TAMAM):**
+- `firmware/esp32_ground_station/ground_station.ino` `sendFaceDelivery()` → kameradan JPEG yakalar (160×120 QQVGA, kalite 25 ≈ Q65), `FACE_IMAGE_BEGIN` + N × `FACE_IMAGE_CHUNK` paketler.
+- `onboard/lora_receiver.py` `ImageReassembler` ile birleştirir, `FaceDelivery(gps, jpeg)` üretir.
+- `onboard/mission.py` `_do_wait_packet` → `verifier.enroll_from_jpeg()` ile referans yüzü tek atımda enroll eder.
+- Legacy `DELIVERY_REQUEST` (recipient_id) hâlâ destekli — operatör tercih ederse fallback.
 
 ---
 
-### Q4 — Donanım Mevcudiyeti
-Hangi donanımlar **şu an** test için elde? (Sahaya çıkmadan ne kadar HIL yapabiliriz?)
+### Q2 — LoRa Güvenliği → **(a) AES-128-CCM + persistent seq + SHA-256**
+**Gerekçe:** Rapor 1.2.2 "şifrelenmiş veri iletimi" + 3.4.3 "veri paketi şifreleme algoritmaları takım üyelerimiz tarafından yazılmıştır" — şifreleme rapor taahhüdü.
 
-| Donanım | Var (Y/N) | Notlar |
+**Uygulama (Sprint 2 P1.1 — TAMAM):**
+- `onboard/packet_protocol.py` ve `firmware/.../packet_protocol.h`:
+  - 32-bit monotonik seq (8-bit wrap fixi).
+  - AES-128-CCM (Python `cryptography.AESCCM`, ESP32 `mbedtls/ccm.h`). Nonce = seq32 + msg_type + chunk + "KOKPIT0" pad → 13 byte.
+  - SHA-256 ilk 8 byte payload hash header'da.
+  - Replay protection: LRU son 256 seq Jetson tarafında.
+  - Boot beacon (`MSG_BOOT_BEACON`) — ESP32 reboot sonrası seq pencere resync.
+- ESP32 NVS `Preferences` "kokpit/seq" — boot'ta +1000 sıçra, nonce reuse imkânsız.
+- Anahtar: `~/.config/kokpit/lora.key` (Jetson) + ESP32 NVS "kokpit/aes_key" (16 byte). `KOKPIT_AES_ENABLED` define ile aktif. Anahtar yoksa plaintext fallback (geliştirme kolaylığı).
+
+---
+
+### Q3 — Yarışma Alanı GPS Köşeleri → **TAKIMA SORULMALI**
+Saha henüz duyurulmadıysa boş bırak. Duyurulunca `ardupilot/kokpit_arena.poly` üret + `mavlink_interface.setup_geofence(polygon, alt_max=50)` çağrılır.
+
+Default geofence aktif: 200 m yarıçap, 50 m max yükseklik, RTL on breach.
+
+---
+
+### Q4 — Donanım Mevcudiyeti → **TAKIMA SORULMALI**
+Listenin doldurulması saha test planını belirler. Tüm donanım yoksa SITL + sahte LoRa ile gelişim devam eder.
+
+---
+
+### Q5 — Async Refactor → **(b) Minimal threading.Event cancel**
+**Gerekçe:** Mevcut `threading` tasarımı çalışıyor; full asyncio rewrite riski yarışma takvimine yakın. Phase cancellation ihtiyacı `threading.Event` ile yeterli düzeyde çözülür.
+
+**Uygulama (Sprint 3 P2.2 — TAMAM):**
+- `onboard/mission.py` `self._cancel_event = threading.Event()` eklendi.
+- `request_abort()` event set eder, blocking loop'lar polling yerine event.is_set() bakar.
+- Failsafe priority queue (P0.2 — TAMAM) farklı failsafe'lerin önceliklendirilmesini sağlar.
+
+---
+
+### Q6 — Yüz Tanıma Backend → **(c) TensorRT default + dlib fallback**
+**Gerekçe:** Rapor 2.1.2 ve 3.3.1.2'de **"TensorRT destekli Evrişimli Sinir Ağları"** açıkça yazılı. TRT primary olmalı; dlib (mevcut `face_recognition`) Jetson hardware hazır olmadan geliştirme için fallback.
+
+**Uygulama (Sprint 2 P1.3 — KISMEN):**
+- TRT backend kod stub'u `onboard/face_verifier.py` içinde planlandı (Jetson hardware olmadan engine build edilemez).
+- TODO: ArcFace R50 ONNX → TensorRT FP16 engine build scripti (`tools/build_face_trt.py`). Engine cache key: `{model}_{trt}_{jetpack}_{precision}.engine`.
+- Dlib `face_recognition` mevcut, Jetson kurulumu olunca TRT'ye geçilecek.
+
+---
+
+### Q7 — PRECLAND vs Custom PID → **(c) Hibrit: PID primary + PRECLAND complement**
+**Gerekçe:** Rapor 3.3.1.3'te "Visual Servoing PID Loop algoritması" açıkça yazılı — PID primary olmalı. ArduCopter PRECLAND yerleşik Kalman'ı yan tarafta çalışıp ek dayanıklılık sağlayabilir (rapor PRECLAND'i yasaklamıyor).
+
+**Uygulama (Sprint 2 P1.4 — TAMAM):**
+- `onboard/visual_servo.py` her tespit sonrası `mavlink.send_landing_target(angle_x, angle_y, distance)` çağırır.
+- `ardupilot/kokpit_precland.param`: `PLND_ENABLED=1, PLND_TYPE=1` (MAVLink), `PLND_EST_TYPE=1` (Kalman).
+- Custom PID hız döngüsü görsel servoing'i sürdürür; PRECLAND Pixhawk EKF içinde paralel pozisyon kestirimine katkı yapar.
+
+---
+
+### Q8 — ArduCopter Param Dosyası Sahipliği → **(a) Repo'da maintain**
+**Uygulama (Sprint 1 P0.5 — TAMAM):**
+- `ardupilot/kokpit_baseline.param`
+- `ardupilot/kokpit_companion.param` (TELEM2 921600)
+- `ardupilot/kokpit_precland.param`
+- `ardupilot/kokpit_lidar.param` (TFS20)
+- `ardupilot/kokpit_servo.param` (AUX1/SERVO9)
+- `ardupilot/kokpit_failsafe.param` (batarya voltaj, RC, GCS, EKF, crash)
+- `ardupilot/kokpit_geofence.param`
+
+MissionPlanner: Full Parameter List → Load from file. Sırayla yükle, her birinden sonra "Compare Params" + kontrol et.
+
+---
+
+### Q9 — LoRa Frekansı → **433 MHz (TR ISM bandı)**
+Rapor 3.2.4 ve donanım listesi 433T20D kullandığımızı belirtiyor. Türkiye 433.05–434.79 MHz ISM bandı (BTK onaylı). LoRa modülü bu band içinde kalmalı.
+
+---
+
+### Q10 — Yüz Dataset Enrollment → **Demo öncesi alıcı yüzü ESP32 ile yakalanır**
+Yeni mod sayesinde önceden enroll gerekmez — buton anında alıcı yüzü ESP32 kamerasından yakalanıp drone'a gönderilir. Drone tek atımda referans embedding üretir.
+
+---
+
+### Q11 — Saha Test Takvimi → **TAKIMA SORULMALI**
+Sprint 4 zorunlu (2 gün): kalibrasyon + PID tuning + ArduCopter AUTOTUNE + failsafe test + 3 rehearsal uçuş.
+
+---
+
+### Q12 — Yedek Donanım → **TAKIMA SORULMALI**
+Yarışma günü için minimum: 2× LiPo, 4× pervane, 1× ESP32, 1× motor.
+
+---
+
+## Sprint 0 Bug Atama (TAMAM)
+
+| Bug | Dosya | Durum |
 |---|---|---|
-| Pixhawk 2.4.8 | | |
-| Jetson Orin Nano | | |
-| IMX219 kamera | | |
-| Benewake TFS20 lidar | | |
-| Holybro M9N GPS | | |
-| ESP32 TTGO T-Display | | |
-| NEO-M8N GPS (yer) | | |
-| OV5640 (yer kamera) | | |
-| LoRa E32 433T20D ×2 | | |
-| SIK Telemetry V3 | | |
-| Drone frame ZD550 + motor + ESC + LiPo | | |
-| Servo + paket bırakma mekanizması | | |
+| `EKF_ATTITUDE` AttributeError | `onboard/mavlink_interface.py` | TAMAM (literal bit flags kullanıldı) |
+| Yaw mask `YAW_IGNORE` bit eksik | `onboard/mavlink_interface.py` | TAMAM (`IGNORE_YAW | IGNORE_YAW_RATE`) |
+| `mission_start` None kontrol | `onboard/mission.py` | TAMAM (None-safe + transition guard) |
+| 8-bit seq → 32-bit + NVS persistent | `firmware/.../ground_station.ino` | TAMAM (Preferences NVS + boot +1000 jump) |
+| Servo ACK + retry | `onboard/mavlink_interface.py` `set_servo()` | TAMAM (3 retry + COMMAND_ACK timeout 500 ms) |
+| `SimLoRaReceiver.wait_for_delivery` event | `onboard/lora_receiver.py` | NO-OP (`queue.get(timeout)` zaten event-based) |
 
 ---
 
-## 🟡 ARCHITECTURE — Takım Onayı
+## Bekleyen — Donanım Hazır Olunca
 
-### Q5 — Async Refactor Kapsamı
-**Soru:** `mission.py` şu an blocking + threading. Phase transition'da eski phase task'ları cancel edilmiyor → race condition riski (servoing failsafe sırasında hala komut atabilir).
-- (a) ✅ `asyncio.TaskGroup` ile full refactor (1 gün, daha temiz, modern)
-- (b) ⚠️ Minimal: `threading.Event` cancel flag'leri serpiştir (3 sa, mevcut yapıyı koru)
-- (c) ❌ Mevcut tasarımı koru, race condition'ı kabul et
-
-**Cevap:**
-
----
-
-### Q6 — Yüz Tanıma Backend
-**Soru:** Şu an dlib `face_recognition` (CPU only) — Jetson'da 1–2 FPS, doğrulama uzun sürer.
-- (a) ✅ TensorRT InsightFace ArcFace R50 (FP16, 10+ FPS, kurulumu zahmetli)
-- (b) ⚠️ Mevcut dlib (kabul edilebilir, hover süresini uzat)
-- (c) ✅ İkisi de — dlib fallback, TRT default
-
-**Cevap:**
+1. TensorRT ArcFace engine build (Jetson + JetPack 6.x gerekir)
+2. Kamera kalibrasyon (chessboard 20 pose)
+3. Lidar/kamera extrinsics ölçümü → `onboard/configs/extrinsics.yaml`
+4. PID gain tuning (saha, 10–20 iterasyon)
+5. ArduCopter AUTOTUNE
+6. Geofence GPS köşelerinin sahada ölçülmesi
+7. Saha test uçuşları (Sprint 4)
 
 ---
 
-### Q7 — PRECLAND vs Custom PID
-**Soru:** ArduCopter yerleşik PRECLAND (`LANDING_TARGET` mesajı) hazır, test edilmiş. Custom PID'imiz tuning gerektirir.
-- (a) ✅ PRECLAND primary, custom PID fallback
-- (b) ⚠️ Custom PID primary (kontrol bizde, raporda "Visual Servoing PID" diyoruz)
-- (c) ✅ İkisi de implemente, config flag ile seç (önerilen)
-
-**Cevap:**
-
----
-
-### Q8 — ArduCopter Param Dosyası Sahipliği
-**Soru:** `ardupilot/*.param` dosyalarını kim üretip commit edecek?
-- (a) Repo'da maintain (versionlu, herkes pull edip MissionPlanner'dan yükler) ✅
-- (b) MissionPlanner'da manuel, paylaşmadan
-- (c) Hibrit (baseline repo'da, saha tuning manuel)
-
-**Cevap (kim) / (hangi):**
-
----
-
-## 🟢 OPERASYONEL — Hızlı Cevap
-
-### Q9 — LoRa Frekansı Yasal Onay
-**Soru:** Türkiye'de 433 MHz LoRa kullanımı yasal mı? Yarışma izin verilen frekansları belirtti mi?
-- Yarışma şartnamesi: ?
-- Yasal band: 433.05–434.79 MHz ISM (Türkiye için onaylı kanal)
-
-**Cevap:**
-
----
-
-### Q10 — Yüz Veri Seti Enrollment
-**Soru:** Alıcı kişinin yüzü ne zaman enroll edilecek?
-- (a) Yarışma günü, sahada, jüri/yetkili kişi ile
-- (b) Önceden çoklu kişi (jüri kim olursa)
-- (c) Demo öncesi tek kişi belirlenip enroll
-
-**Cevap:**
-
----
-
-### Q11 — Saha Test Takvimi
-**Soru:** Demo öncesi ne kadar saha testi yapılabilecek?
-- Kaç gün?
-- Hangi sahada (üniversite kampüsü / yarışma alanı / başka)?
-- Pilot kim?
-
-**Cevap:**
-
----
-
-### Q12 — Yedek Donanım
-**Soru:** Yarışma günü kritik donanım kırılırsa yedek var mı?
-- Yedek pervane: var/yok
-- Yedek motor: var/yok
-- Yedek ESP32: var/yok
-- Yedek LiPo: var/yok
-- Yedek RPi/Jetson: var/yok
-
-**Cevap:**
-
----
-
-## 🔧 BUG ATAMA (Sprint 0 hızlı)
-
-| Bug | Kim Düzeltecek |
-|---|---|
-| `EKF_ATTITUDE` AttributeError (`mavlink_interface.py:153`) | |
-| Yaw mask `YAW_IGNORE` bit eksik (`mavlink_interface.py:262,281`) | |
-| `mission.run()` `mission_start` None kontrol (`mission.py:131-178`) | |
-| 8-bit seq → 32-bit + NVS persistent (`ground_station.ino:65`) | |
-| Servo ACK + retry | |
-| `SimLoRaReceiver.wait_for_delivery` event yerine sleep | |
-
----
-
-## 📅 Sonraki Adımlar
-
-1. Bu dosyayı takım toplantısında doldur (1 saat)
-2. Cevaplara göre `docs/PLAN.md` Sprint 1–4 görev atamalarını sabitle
-3. Sprint 0 (1 gün) bug fix → CI yeşil
-4. Sprint 1 başla
-
-**Toplantı tarihi:** _____
-**Katılımcılar:** Arda, Zeki, Attia, Enes (takım sorumlusu)
-**Karar verme yöntemi:** Çoğunluk + Enes veto hakkı (raporlama sorumlusu olarak)
+**Toplantı tarihi:** _____ **Onaylayan:** _____ (rapor sorumlusu)

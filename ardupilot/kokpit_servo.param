@@ -1,0 +1,8 @@
+# Paket bırakma servo — AUX1 / SERVO9
+# SERVO9_FUNCTION=0 → script/MAVLink kontrolünde (MAV_CMD_DO_SET_SERVO)
+# Failsafe: SERVO9_TRIM=1000 (kapalı). Boot lock garantisi.
+SERVO9_FUNCTION,0
+SERVO9_MIN,1000
+SERVO9_MAX,2000
+SERVO9_TRIM,1000
+SERVO9_REVERSED,0
