@@ -1,0 +1,15 @@
+# Kokpit İHA — drone (Jetson) tarafı Python bağımlılıkları
+#
+# Jetson Orin Nano notu: OpenCV genellikle JetPack ile sistemde kuruludur ve
+# CUDA hızlandırmalıdır. O durumda opencv satırını ATLA (sistem OpenCV'sini kullan).
+# face_recognition, dlib derler — Jetson'da uzun sürebilir; swap aç.
+
+pymavlink>=2.4.40
+numpy>=1.23
+opencv-contrib-python>=4.7      # cv2.aruco için (Jetson'da sistem OpenCV varsa atla)
+pyserial>=3.5                   # LoRa E32 UART (gerçek donanım)
+face_recognition>=1.3.0         # biyometrik (dlib gerektirir)
+
+# --- Geliştirme / test (uçuş için gerekmez) ---
+pytest>=7.0
+pytest-timeout>=2.1

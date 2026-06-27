@@ -1,0 +1,64 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.venv/
+venv/
+.python-version
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs and runtime
+logs/*.log
+logs/*.bin
+logs/*.tlog
+logs/*.jsonl
+logs/runs/
+data/faces/*.jpg
+data/faces/*.png
+!data/faces/.gitkeep
+!data/faces/README.md
+
+# Calibration outputs (regenerate per-camera)
+onboard/camera_calibration.npz
+camera_calibration.npz
+
+# Secrets
+*.key
+.env
+.env.local
+secrets/
+
+# Build artifacts
+build/
+dist/
+*.engine
+*.onnx
+
+# PlatformIO (future)
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# Arduino temp
+*.elf
+*.hex
+
+# Compiled / cache
+*.o
+*.obj
