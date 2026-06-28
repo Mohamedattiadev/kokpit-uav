@@ -1,0 +1,14 @@
+# extrinsics.yaml — sensör montaj offsetleri (gövde koordinatına dönüşüm)
+# Koordinat: x=ileri (burun), y=sağ, z=aşağı. Açılar derece.
+# ZD550 frame için tahmini değerler — saha öncesi tools/calibrate_extrinsics.py.
+cam_to_body:
+  x: 0.00
+  y: 0.00
+  z: 0.10
+  roll: 0.0
+  pitch: 0.0
+  yaw: 0.0
+lidar_to_body:
+  x: 0.05
+  y: 0.00
+  z: 0.05

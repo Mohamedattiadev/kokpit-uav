@@ -21,6 +21,7 @@ import cv2
 
 from config import CFG, ArucoConfig
 from camera import load_intrinsics
+from extrinsics import load_extrinsics, transform_cam_to_body
 
 
 def _get_dictionary(name: str):
@@ -57,6 +58,7 @@ class ArucoDetector:
             self._new_api = False
         self.cam_mtx, self.dist = load_intrinsics(CFG.camera)
         self.marker_len = self.cfg.marker_length_m
+        self.extrinsics = load_extrinsics()
 
     def _detect_raw(self, gray):
         if self._new_api:
@@ -98,11 +100,14 @@ class ArucoDetector:
         # Metrik poz kestirimi
         try:
             rvec, tvec = self._estimate_pose(marker_corners)
-            x, y, z = float(tvec[0]), float(tvec[1]), float(tvec[2])
-            # Kamera çerçevesi: x=sağ, y=aşağı, z=ileri(lens yönü, yere doğru)
-            det.distance_m = z
-            det.offset_right_m = x       # +sağ
-            det.offset_fwd_m = -y        # image-y aşağı +; ileri = -y
+            # Kamera çerçevesi → gövde uyumlu vektör (offset_fwd = -tvec_y,
+            # offset_right = tvec_x, distance = tvec_z) sonra mount extrinsics.
+            body_in = np.array([float(-tvec[1]), float(tvec[0]),
+                                float(tvec[2])])  # (fwd, right, down/dist)
+            body = transform_cam_to_body(body_in, self.extrinsics)
+            det.offset_fwd_m = float(body[0])
+            det.offset_right_m = float(body[1])
+            det.distance_m = float(body[2])
             rot, _ = cv2.Rodrigues(rvec)
             det.yaw_deg = float(np.degrees(np.arctan2(rot[1, 0], rot[0, 0])))
         except Exception:

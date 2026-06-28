@@ -23,6 +23,7 @@ from typing import Optional
 from pymavlink import mavutil
 
 from config import CFG
+from extrinsics import load_extrinsics, transform_lidar_to_body
 
 # ArduCopter uçuş modları (isim -> custom_mode). mode_mapping() ile de alınır.
 COPTER_MODES = {
@@ -64,7 +65,8 @@ class Telemetry:
     last_heartbeat: float = 0.0
     last_update: float = 0.0
     # Sprint 0/1 — eklenen alanlar
-    lidar_alt: float = 0.0          # m, RANGEFINDER mesajından
+    lidar_alt: float = 0.0          # m, RANGEFINDER mesajından (raw)
+    lidar_alt_body: float = 0.0     # m, gövde altı zemin uzaklığı (extrinsics)
     lidar_ok: bool = False
     lidar_last_update: float = 0.0
     roll: float = 0.0               # rad, ATTITUDE
@@ -85,6 +87,7 @@ class DroneController:
         self._rx_thread: Optional[threading.Thread] = None
         self._running = False
         self._lock = threading.Lock()
+        self.extrinsics = load_extrinsics()
 
     # ----------------------------------------------------------------- bağlantı
     def connect(self, timeout: float = 30.0) -> None:
@@ -188,6 +191,8 @@ class DroneController:
             elif t == "RANGEFINDER":
                 # ArduCopter rangefinder (lidar) — TFS20 mesafe metre
                 self.tel.lidar_alt = msg.distance
+                self.tel.lidar_alt_body = transform_lidar_to_body(
+                    msg.distance, self.extrinsics)
                 self.tel.lidar_ok = True
                 self.tel.lidar_last_update = now
             elif t == "ATTITUDE":
