@@ -366,6 +366,18 @@ class Mission:
         print(f"[GÖREV] Biyometrik doğrulama (alıcı {self.target.recipient_id})...")
         # Hover'da sabit kal
         self.drone.send_velocity_body(0, 0, 0)
+        # M6 — marker rvec yaw'ından alıcıya doğru dön
+        try:
+            ok, frame = self.camera.read()
+            det = self.detector.detect(frame) if ok else None
+            if det is not None and det.found:
+                from visual_servo import marker_yaw_to_heading
+                t = self.drone.telemetry()
+                target_h = marker_yaw_to_heading(det.yaw_deg, t.heading)
+                self.drone.condition_yaw(target_h, relative=False)
+                time.sleep(1.5)   # yaw oturması
+        except Exception as e:
+            print(f"[GÖREV] yaw alignment atlandı: {e}")
         res = self.verifier.verify_with_voting(self.target.recipient_id, self.camera)
         if res.matched:
             print(f"[GÖREV] Kimlik DOĞRULANDI (güven {res.confidence:.2f})")

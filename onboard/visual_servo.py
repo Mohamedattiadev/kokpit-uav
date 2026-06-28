@@ -26,6 +26,15 @@ FWD_SIGN = 1.0    # offset_fwd_m -> ileri hız işareti
 RIGHT_SIGN = 1.0  # offset_right_m -> sağ hız işareti
 
 
+def marker_yaw_to_heading(marker_yaw_deg: float,
+                          drone_heading_deg: float) -> float:
+    """Marker'ın world-yaw'ı + drone heading → drone'un dönmesi gereken hedef
+    heading (rapor M6 — alıcıya bakacak şekilde). Marker rvec yaw zaten dünya
+    çerçevesinde; doğrudan heading olarak kullanılabilir."""
+    h = (drone_heading_deg + marker_yaw_deg) % 360.0
+    return h
+
+
 class PrecisionApproach:
     def __init__(self, drone: DroneController, detector: ArucoDetector, camera,
                  abort_check=None, *, precland_complement: bool = True):

@@ -424,6 +424,19 @@ class DroneController:
             print(f"[MAV] Geofence yükleme hatası: {e}")
             return False
 
+    def condition_yaw(self, heading_deg: float, relative: bool = False,
+                      yaw_rate_deg_s: float = 25.0, ccw: bool = False) -> None:
+        """MAV_CMD_CONDITION_YAW — drone'u verilen heading'e döndür.
+
+        heading_deg: 0..360. relative=True ise mevcut yaw'a göre, False ise mutlak.
+        Delivery'de marker yaw'ından alıcıya bakmak için kullanılır.
+        """
+        direction = -1 if ccw else 1
+        self._command_long(
+            mavutil.mavlink.MAV_CMD_CONDITION_YAW,
+            float(heading_deg % 360.0), float(yaw_rate_deg_s),
+            float(direction), 1.0 if relative else 0.0, 0, 0, 0)
+
     def force_disarm(self) -> bool:
         """Acil disarm (CRASH detection için). Force magic 21196 kullanır."""
         return self.disarm(timeout=2.0, force=True)
