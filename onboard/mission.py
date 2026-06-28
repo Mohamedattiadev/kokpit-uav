@@ -76,9 +76,16 @@ class Mission:
             raise RuntimeError("Konfigürasyon doğrulanamadı")
 
         self.drone.connect()
+        # M8 — mid-mission reboot: AP autoflight modunda + armed ise READ_ONLY
+        t0 = self.drone.telemetry()
+        if t0.armed and t0.mode in ("AUTO", "GUIDED", "RTL", "LAND"):
+            print(f"[GÖREV] Reboot tespit edildi (mode={t0.mode}, armed) "
+                  "-> READ_ONLY. Pilot manual'a alana kadar komut yok.")
+            self.fsm.transition(MissionState.READ_ONLY, force=True)
         if self.dropper is None:
             self.dropper = PackageDropper(self.drone)
-        self.dropper.lock()                       # güvenli başlangıç
+        if self.fsm.state != MissionState.READ_ONLY:
+            self.dropper.lock()                   # güvenli başlangıç
         if self.lora is None:
             self.lora = open_lora()
         n = self.verifier.load_dataset()

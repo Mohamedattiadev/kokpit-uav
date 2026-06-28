@@ -25,11 +25,14 @@ class MissionState(Enum):
     ABORT = auto()             # iptal: güvenli iniş / RTL
     MISSION_COMPLETE = auto()
     FAILED = auto()
+    READ_ONLY = auto()         # mid-mission reboot: pilot/AP komutta, Jetson izler
+    PILOT_OVERRIDE = auto()    # pilot kumandayı aldı (MANUAL/STABILIZE/ACRO)
 
 
 # Geçerli geçişler (denetim/loglama için referans; mission.py uygular)
 VALID_TRANSITIONS = {
-    MissionState.IDLE: {MissionState.WAIT_PACKET, MissionState.ABORT},
+    MissionState.IDLE: {MissionState.WAIT_PACKET, MissionState.ABORT,
+                        MissionState.READ_ONLY, MissionState.PILOT_OVERRIDE},
     MissionState.WAIT_PACKET: {MissionState.PREFLIGHT, MissionState.TAKEOFF,
                                MissionState.FAILED, MissionState.ABORT},
     MissionState.PREFLIGHT: {MissionState.TAKEOFF, MissionState.FAILED, MissionState.ABORT},
@@ -45,6 +48,11 @@ VALID_TRANSITIONS = {
     MissionState.ABORT: {MissionState.RETURN_HOME, MissionState.LANDING, MissionState.FAILED, MissionState.DISARM},
     MissionState.MISSION_COMPLETE: set(),
     MissionState.FAILED: set(),
+    MissionState.READ_ONLY: {MissionState.IDLE, MissionState.DISARM,
+                             MissionState.ABORT, MissionState.MISSION_COMPLETE},
+    MissionState.PILOT_OVERRIDE: {MissionState.IDLE, MissionState.READ_ONLY,
+                                  MissionState.ABORT,
+                                  MissionState.MISSION_COMPLETE},
 }
 
 
