@@ -24,6 +24,7 @@ from pymavlink import mavutil
 
 from config import CFG
 from extrinsics import load_extrinsics, transform_lidar_to_body
+import time_sync
 
 # ArduCopter uçuş modları (isim -> custom_mode). mode_mapping() ile de alınır.
 COPTER_MODES = {
@@ -205,6 +206,11 @@ class DroneController:
             elif t == "HOME_POSITION":
                 self.home_lat = msg.latitude / 1e7
                 self.home_lon = msg.longitude / 1e7
+            elif t == "SYSTEM_TIME":
+                try:
+                    time_sync.update_from_system_time(int(msg.time_unix_usec))
+                except Exception:
+                    pass
 
     def telemetry(self) -> Telemetry:
         with self._lock:

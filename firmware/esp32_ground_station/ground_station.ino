@@ -33,6 +33,8 @@
 
 #include <Arduino.h>
 #include <Preferences.h>
+#include <sys/time.h>
+#include <time.h>
 #include "packet_protocol.h"
 
 // ----------------- DERLEME SEÇENEKLERİ -----------------
@@ -366,6 +368,23 @@ void setup() {
 
 void loop() {
   feedGps(50);
+
+  // GPS UTC alındığında settimeofday — Jetson/Pixhawk ile log korelasyonu.
+  static bool g_time_set = false;
+  if (!g_time_set && gps.date.isValid() && gps.time.isValid() &&
+      gps.date.year() > 2024) {
+    struct tm tm = {};
+    tm.tm_year = gps.date.year() - 1900;
+    tm.tm_mon  = gps.date.month() - 1;
+    tm.tm_mday = gps.date.day();
+    tm.tm_hour = gps.time.hour();
+    tm.tm_min  = gps.time.minute();
+    tm.tm_sec  = gps.time.second();
+    time_t epoch = mktime(&tm);
+    struct timeval tv = { epoch, (suseconds_t)(gps.time.centisecond() * 10000L) };
+    settimeofday(&tv, nullptr);
+    g_time_set = true;
+  }
 
   if (digitalRead(PIN_BUTTON) == LOW &&
       (millis() - lastButtonMs) > 800) {
