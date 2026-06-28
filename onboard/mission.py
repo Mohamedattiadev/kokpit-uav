@@ -123,8 +123,14 @@ class Mission:
         accel_spike_count = 0
         while self._monitor_running:
             t = self.drone.telemetry()
-            # M9 — Pilot manual modlara aldıysa Jetson çekil
-            if t.mode in ("MANUAL", "STABILIZE", "ACRO"):
+            # M9 — Pilot manual modlara aldıysa Jetson çekil. Sadece armed
+            # ve görev aktifken anlamlı (pre-arm STABILIZE varsayılan).
+            if (t.armed and t.mode in ("MANUAL", "STABILIZE", "ACRO") and
+                    self.fsm.state not in (
+                        MissionState.IDLE, MissionState.WAIT_PACKET,
+                        MissionState.PREFLIGHT, MissionState.DISARM,
+                        MissionState.MISSION_COMPLETE,
+                        MissionState.FAILED, MissionState.ABORT)):
                 self._push_failsafe(
                     self.PRIO_USER_ABORT, "PILOT_OVERRIDE",
                     f"Pilot kumandayı aldı (mode={t.mode})")

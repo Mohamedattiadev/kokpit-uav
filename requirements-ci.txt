@@ -1,0 +1,10 @@
+# CI bağımlılıkları (ubuntu-22.04 GitHub Actions)
+# dlib derlemesi 5+ dk; face_recognition CI'da atlanır — OpenCV fallback yeterli.
+pymavlink>=2.4.40
+numpy>=1.23
+opencv-contrib-python-headless>=4.7
+pyserial>=3.5
+cryptography>=41.0          # AES-128-CCM için
+pytest>=7.0
+pytest-timeout>=2.1
+ruff

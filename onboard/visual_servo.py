@@ -164,44 +164,73 @@ class PrecisionApproach:
 
     # ----------------------------------------------------- sarmal arama
     def spiral_search(self, on_frame=None) -> bool:
-        """Mevcut konum çevresinde genişleyen sarmal waypoint'ler tarar.
-        Marker görülürse True döner ve İHA marker üstünde durur."""
-        s, f = CFG.safety, CFG.flight
-        t0 = self.drone.telemetry()
-        base_lat, base_lon = t0.lat, t0.lon
-        search_alt = f.search_altitude_m
-        start = time.time()
+        """Sürekli velocity akışlı Arşimet sarmalı (10 Hz).
 
-        # Arşimet sarmalı: r = step * theta/(2pi)
-        theta = 0.0
+        r(t) = a + b*t, θ(t) = ω*t. Yarıçap büyüdükçe ileri/yan hızlar
+        sürekli güncellenir; goto_global çağrısı yapılmaz. Marker kilidi
+        görülürse anında brake + True.
+        """
+        s, f = CFG.safety, CFG.flight
+        loop_hz = 10.0
+        dt = 1.0 / loop_hz
+        a = 0.0                          # başlangıç yarıçapı
+        b = s.spiral_step_m / (2 * math.pi)   # tur başına step
+        omega = s.spiral_speed_ms / max(0.5, s.spiral_step_m / 2.0)
+        # Hız: dr/dt = b*omega; tangensiyel = r*omega; toplam ≈ spiral_speed
+        start = time.time()
+        t_param = 0.0
         while time.time() - start < s.marker_search_timeout_s:
+            loop_t = time.time()
             if self.abort_check() or not self.drone.link_alive():
                 self._brake()
                 return False
-            r = s.spiral_step_m * theta / (2 * math.pi)
+            r = a + b * t_param
             if r > s.spiral_max_radius_m:
+                self._brake()
                 print("[SERVO] Sarmal max yarıçapa ulaştı, marker yok")
                 return False
-            dN = r * math.cos(theta)
-            dE = r * math.sin(theta)
-            tlat = base_lat + (dN / 111320.0)
-            tlon = base_lon + (dE / (111320.0 * math.cos(math.radians(base_lat))))
-            self.drone.goto_global(tlat, tlon, search_alt)
+            theta = omega * t_param
+            # Body frame velocity: ileri = radial+, sağ = tangential bileşeni
+            v_radial = b * omega
+            v_tangent = r * omega
+            v_fwd = v_radial * math.cos(theta) - v_tangent * math.sin(theta)
+            v_right = v_radial * math.sin(theta) + v_tangent * math.cos(theta)
+            cap = s.spiral_speed_ms
+            v_fwd = max(-cap, min(cap, v_fwd))
+            v_right = max(-cap, min(cap, v_right))
+            self.drone.send_velocity_body(v_fwd, v_right, 0.0)
 
-            # Bu segmentte marker tara
-            seg_start = time.time()
-            while time.time() - seg_start < 2.0:
-                ok, frame = self.camera.read()
-                det = self.detector.detect(frame) if ok else Detection(found=False)
-                if on_frame:
-                    on_frame(frame, det)
-                if det.found:
-                    self._brake()
-                    print("[SERVO] Marker sarmal aramada bulundu")
-                    return True
-                time.sleep(0.05)
-            theta += math.pi / 2  # çeyrek tur ilerle
+            # Her hız tick'inde 1 frame tara
+            ok, frame = self.camera.read()
+            det = self.detector.detect(frame) if ok else Detection(found=False)
+            if on_frame:
+                on_frame(frame, det)
+            if det.found:
+                self._brake()
+                print("[SERVO] Marker sarmal aramada bulundu")
+                return True
+            t_param += dt
+            _sleep_to_rate(loop_t, dt)
         return False
+
+    @staticmethod
+    def archimedes_trajectory(step_m: float, max_radius_m: float,
+                              omega: float = 0.5,
+                              dt: float = 0.1) -> list[tuple[float, float]]:
+        """(x, y) noktaları döner — test/doğrulama amaçlı."""
+        b = step_m / (2 * math.pi)
+        pts: list[tuple[float, float]] = []
+        t = 0.0
+        while True:
+            r = b * t
+            if r > max_radius_m:
+                break
+            th = omega * t
+            pts.append((r * math.cos(th), r * math.sin(th)))
+            t += dt
+            if t > 10000:
+                break
+        return pts
 
 
 def _sleep_to_rate(loop_start: float, dt: float):
