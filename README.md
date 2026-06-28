@@ -1,5 +1,10 @@
 # Kokpit UAV
 
+[![CI](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml)
+![tests](https://img.shields.io/badge/tests-203%20passed-brightgreen)
+![status](https://img.shields.io/badge/yaz%C4%B1l%C4%B1m-tamam-brightgreen)
+![donanim](https://img.shields.io/badge/donan%C4%B1m-bekleniyor-yellow)
+
 **Teknofest 2026 — Uluslararası İHA Yarışması, Serbest Görev Kategorisi**
 Ankara Yıldırım Beyazıt Üniversitesi · Kokpit Takımı
 
@@ -43,8 +48,9 @@ Gerçek donanım için (Jetson kurulumu, ArduPilot parametreleri, kablolama, kal
 
 | Belge | İçerik |
 |---|---|
-| [`docs/KILAVUZ.md`](docs/KILAVUZ.md) | Adım adım kurulum + saha kullanım kılavuzu. Yeni başlayan buradan başlamalı. |
-| [`docs/PLAN.md`](docs/PLAN.md) | Yapılacaklar listesi. 4 sprint, görev atamaları, effort tahminleri. |
+| [`docs/DONANIM_PLANI.md`](docs/DONANIM_PLANI.md) | **🔧 Donanım ekibi buradan başlamalı.** 4 iş için adım adım rehber + komut + sorun giderme. |
+| [`docs/KILAVUZ.md`](docs/KILAVUZ.md) | Adım adım kurulum + saha kullanım kılavuzu. |
+| [`docs/PLAN.md`](docs/PLAN.md) | Yapılacaklar listesi. 4 sprint, görev atamaları, effort tahminleri. M1–M12 tamam. |
 | [`docs/QUESTIONS_FOR_TEAM.md`](docs/QUESTIONS_FOR_TEAM.md) | Takım kararı bekleyen / verilen sorular ve gerekçeleri. |
 | [`docs/report/`](docs/report/) | Resmi yarışma raporu (PDF) ve donanım alım listesi. **Canonical spec — yazılım bundan sapamaz.** |
 | [`docs/prompts/`](docs/prompts/) | Modül bazlı teknik prompt'lar (AI destekli geliştirme için). |
@@ -121,9 +127,9 @@ Tamamlanan 12 ana modül:
 1. **TensorRT engine build.** Jetson Orin Nano + JetPack 6.x kurulduğunda `tools/build_face_trt.py` çalıştırılacak. Bu yapılmazsa yüz tanıma CPU üzerinde 1-2 FPS'te kalır (dlib fallback).
 2. **Extrinsics kalibrasyon.** Kamera + lidar gövdeye monte edildikten sonra cetvelle ölçü alınıp `tools/calibrate_extrinsics.py` ile kaydedilmeli. Yapılmazsa iniş 5-10 cm kayar.
 3. **ESP32 RX parser.** Drone'dan gelen TELEMETRY paketini yer istasyonu TFT'sinde göstermek için firmware'e parser eklenecek. Saha öncesi ikinci bir firmware PR'ı.
-4. **Saha test uçuşları.** ArduCopter PID tune + manuel → stabilize → loiter → guided kademe testleri. `docs/KILAVUZ.md` içinde adımlar.
+4. **Saha test uçuşları.** ArduCopter PID tune + manuel → stabilize → loiter → guided kademe testleri.
 
-Detay için `docs/PLAN.md`.
+Donanım ekibi için tam detaylı plan (malzeme listesi, komutlar, doğrulama checklist'i, sorun giderme): [`docs/DONANIM_PLANI.md`](docs/DONANIM_PLANI.md).
 
 ---
 
