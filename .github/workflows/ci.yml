@@ -18,19 +18,18 @@ jobs:
           python-version: "3.10"
           cache: pip
 
-      - name: Install dependencies
+      - name: Install CI dependencies (no dlib)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ruff pytest
+          pip install -r requirements-ci.txt
 
       - name: Lint (ruff)
-        run: ruff check onboard/ simulation/ tests/ tools/ || true
+        run: ruff check onboard/ simulation/ tests/ tools/ scripts/ || true
 
       - name: Unit tests (KOKPIT_SIM=1)
         env:
           KOKPIT_SIM: "1"
-        run: pytest tests/ -q
+        run: pytest tests/ -q --timeout=180
 
       - name: Software demo smoke
         env:
