@@ -29,7 +29,7 @@ Gerçek donanıma ihtiyaç yok — tüm pipeline simülasyonda çalışır:
 git clone https://github.com/Mohamedattiadev/kokpit-uav
 cd kokpit-uav
 make install        # Python bağımlılıkları
-make test           # 26 unit test, hepsi geçmeli
+make test           # 203 unit test, hepsi geçmeli (~2 dk)
 make demo           # donanımsız tam görev simülasyonu (terminal'de izlenir)
 make sitl           # ArduCopter SITL ile gerçek uçuş simülasyonu
 ```
@@ -69,8 +69,10 @@ kokpit-uav/
 ├── ardupilot/                        Pixhawk parametre dosyaları
 │                                     MissionPlanner üzerinden yüklenir.
 │
-├── tests/                            pytest unit testler
-├── tools/                            Kalibrasyon scriptleri
+├── tests/                            pytest unit testler (203 test)
+├── tools/                            Kalibrasyon + TRT engine build
+├── scripts/                          Görev sonrası analiz (plot)
+├── systemd/                          Jetson auto-restart servisi
 ├── data/faces/                       Alıcı yüz veritabanı (gitignored)
 ├── docs/                             KILAVUZ + PLAN + rapor + spec
 └── .github/workflows/                CI (lint + test + smoke)
@@ -91,11 +93,37 @@ kokpit-uav/
 
 ## Mevcut Durum
 
-- Yazılım simülasyonda uçtan uca çalışır. 26 unit test geçer (`make test`).
-- 12 kritik bug ve eksik tespit edildi — `docs/PLAN.md` Sprint 0-4 ile sırayla kapatılıyor. Yaklaşık effort: 13 gün.
-- Gerçek uçuş henüz yapılmadı. Saha tuning ve test uçuşları sprint 4'te.
+**Yazılım tarafı tamamlandı.**
 
-Yarışmaya hazırlanmak için `docs/PLAN.md` baştan sona uygulanmalı. Bu repo'da geliştirme yapan herkes önce o dosyayı okumalı.
+- 203 unit test geçer (`make test`, ~2 dk). CI yeşil (GitHub Actions).
+- Sprint 0 + Sprint 1 (uçuş güvenliği) + Sprint 2 (rapor uyumu) + Sprint 3 (operasyon kalitesi) tamam.
+- Simülasyonda uçtan uca otonom görev çalışır.
+
+Tamamlanan 12 ana modül:
+
+| # | Modül | Açıklama |
+|---|---|---|
+| M1 | TensorRT yüz tanıma | RetinaFace + ArcFace, dlib fallback |
+| M2 | Extrinsics dönüşümü | Kamera/lidar mount offset → gövde çerçevesi |
+| M3 | Zaman senkronu | MAVLink SYSTEM_TIME + ESP32 GPS UTC |
+| M4 | Watchdog + systemd | Jetson çökerse 15 sn'de otomatik restart |
+| M5 | Log indirme | Pixhawk dataflash + plot aracı |
+| M6 | Yaw hizalama | Teslimatta drone alıcıya bakar |
+| M7 | LoRa link telemetri | RSSI + paket kaybı + telemetry paket |
+| M8 | Reboot kurtarma | Mid-mission reboot → READ_ONLY mod |
+| M9 | Pilot override | Manuel moda alınca Jetson çekilir |
+| M10 | BOOT_BEACON | ESP32 reboot sonrası replay reset |
+| M11 | CI doğrulama | requirements-ci.txt, 3 dk pipeline |
+| M12 | Arşimet sarmal | Sürekli velocity arama trajektorisi |
+
+**Donanım bekleyen 4 iş:**
+
+1. **TensorRT engine build.** Jetson Orin Nano + JetPack 6.x kurulduğunda `tools/build_face_trt.py` çalıştırılacak. Bu yapılmazsa yüz tanıma CPU üzerinde 1-2 FPS'te kalır (dlib fallback).
+2. **Extrinsics kalibrasyon.** Kamera + lidar gövdeye monte edildikten sonra cetvelle ölçü alınıp `tools/calibrate_extrinsics.py` ile kaydedilmeli. Yapılmazsa iniş 5-10 cm kayar.
+3. **ESP32 RX parser.** Drone'dan gelen TELEMETRY paketini yer istasyonu TFT'sinde göstermek için firmware'e parser eklenecek. Saha öncesi ikinci bir firmware PR'ı.
+4. **Saha test uçuşları.** ArduCopter PID tune + manuel → stabilize → loiter → guided kademe testleri. `docs/KILAVUZ.md` içinde adımlar.
+
+Detay için `docs/PLAN.md`.
 
 ---
 
