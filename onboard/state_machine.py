@@ -55,8 +55,19 @@ class StateMachine:
         self.history: list[tuple[float, MissionState]] = [(time.time(), initial)]
 
     def transition(self, new_state: MissionState, force: bool = False) -> bool:
+        """Geçerli geçişi uygula. Geçersiz + force=False ise REDDET (False döndür).
+
+        Eski davranış sessizce force ediyordu — güvenlik açığı. Şimdi mission.py
+        kasıtlı 'kestirme' geçişler için force=True geçmek zorunda.
+        """
+        if new_state == self.state:
+            return True
         allowed = VALID_TRANSITIONS.get(self.state, set())
-        if not force and new_state not in allowed and new_state != self.state:
+        if new_state not in allowed and not force:
+            self.log(f"[FSM] HATA: geçersiz geçiş {self.state.name} -> "
+                     f"{new_state.name} REDDEDILDI (force kullanılmadı)")
+            return False
+        if new_state not in allowed and force:
             self.log(f"[FSM] UYARI: geçersiz geçiş {self.state.name} -> "
                      f"{new_state.name} (force ile yapıldı)")
         self.log(f"[FSM] {self.state.name} -> {new_state.name}")

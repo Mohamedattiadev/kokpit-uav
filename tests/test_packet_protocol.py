@@ -50,8 +50,8 @@ def test_corrupted_crc_rejected():
     req = DeliveryRequest(lat=1.0, lon=2.0, alt=3.0, recipient_id=1,
                           gps_fix=3, num_sats=8)
     raw = bytearray(encode_delivery_request(req, seq=10))
-    # SHA alanı header'da [10:18] — bozarsak CRC fail (header CRC'ye dahil)
-    raw[10] ^= 0xFF
+    # SHA8 alanı header[12:20]. byte 12 flip → CRC fail (CRC header+payload üzerinden)
+    raw[12] ^= 0xFF
     p = StreamParser()
     out = p.feed(bytes(raw))
     assert out == []

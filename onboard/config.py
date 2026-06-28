@@ -166,9 +166,11 @@ class DropperConfig:
     pwm_locked: int = 1100             # kilitli (paket tutuluyor)
     pwm_released: int = 1900           # açık (paket bırakıldı)
     actuation_time_s: float = 1.5      # servonun hareketi tamamlaması için bekleme
-    # Servo guard'ları (Sprint 1 P0.3)
+    # Servo guard'ları (Sprint 1 P0.3) — drop_altitude_m ± buffer
+    # PrecisionApproach lock tolerance ile uyumlu (lock ±0.5 m'de oluyor)
     min_drop_altitude_m: float = 1.0   # bu seviyenin altında bırakma yasak
-    max_drop_altitude_m: float = 2.5   # bu seviyenin üstünde bırakma yasak
+    max_drop_altitude_m: float = 3.5   # bu seviyenin üstünde bırakma yasak
+                                       # (drop_altitude=2.5 + 1.0 buffer)
 
 
 # =============================================================================

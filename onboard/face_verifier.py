@@ -166,11 +166,18 @@ class FaceVerifier:
         """LoRa'dan gelen JPEG bayt dizisini decode et + enroll et.
 
         Sprint 2 P1.2 — yer istasyonu yüz görüntüsünü gönderdiğinde drone tek
-        atımda referans embedding'i çıkarır."""
+        atımda referans embedding'i çıkarır. Defensive: boş/bozuk byte → False."""
         import numpy as np
-        arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
-        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
-        if img is None:
+        if not jpeg_bytes or len(jpeg_bytes) < 4:
+            print("[YÜZ] enroll_from_jpeg: boş veya çok küçük payload")
+            return False
+        try:
+            arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+            img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        except Exception as e:
+            print(f"[YÜZ] enroll_from_jpeg: decode hatası {e}")
+            return False
+        if img is None or img.size == 0:
             print("[YÜZ] enroll_from_jpeg: JPEG decode edilemedi")
             return False
         if self.backend.enroll(recipient_id, img):

@@ -75,7 +75,12 @@ class FakeDrone:
                 battery_voltage=self.battery_voltage, battery_remaining=80,
                 satellites=14, hdop=0.7, fix_type=3,
                 armed=self.armed, mode=self.mode, ekf_ok=True,
-                last_heartbeat=time.time(), last_update=time.time())
+                last_heartbeat=time.time(), last_update=time.time(),
+                # Sprint 1: lidar + IMU sim alanları
+                lidar_alt=self.alt, lidar_ok=True,
+                lidar_last_update=time.time(),
+                roll=0.0, pitch=0.0, yaw=math.radians(self.heading),
+                accel_z_g=1.0)
 
     def link_alive(self):
         return self._running
@@ -134,9 +139,25 @@ class FakeDrone:
     def send_velocity_ned(self, vx, vy, vz, yaw_rate=0.0):
         self.send_velocity_body(vx, vy, vz, yaw_rate)
 
-    def set_servo(self, channel, pwm):
+    def set_servo(self, channel, pwm, retries: int = 3,
+                  ack_timeout: float = 0.5) -> bool:
+        # Sim'de ACK her zaman OK; real DroneController.set_servo() ile imza
+        # uyumlu olmalı (Sprint 0 ACK + retry fix).
         with self._lock:
             self.servo_pwm[channel] = pwm
+        return True
+
+    def send_landing_target(self, angle_x, angle_y, distance, time_usec=0):
+        """PRECLAND complement — sim no-op (gerçek ArduCopter EKF'i besler)."""
+        with self._lock:
+            self._last_landing_target = (angle_x, angle_y, distance)
+
+    def force_disarm(self) -> bool:
+        return self.disarm(force=True)
+
+    def setup_geofence(self, polygon, alt_max_m: float = 50.0,
+                       radius_m: float = 200.0) -> bool:
+        return True
 
     def distance_to(self, lat, lon):
         with self._lock:
