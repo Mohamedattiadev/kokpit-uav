@@ -296,6 +296,23 @@ def encode_ack(acked_seq: int, status: int = 0, seq: int = 0) -> bytes:
     return _frame(MsgType.ACK, seq, 0, 1, payload)
 
 
+# Telemetry: <mode_id:u8><batt_mV:u16><phase:u8><rssi_dbm:i8><loss_pct:u8>
+TELEMETRY_FMT = "<BHBbB"
+
+
+def encode_telemetry(mode_id: int, batt_mv: int, phase: int,
+                     rssi_dbm: int, loss_pct: int, seq: int = 0) -> bytes:
+    payload = struct.pack(TELEMETRY_FMT,
+                          mode_id & 0xFF, batt_mv & 0xFFFF, phase & 0xFF,
+                          max(-128, min(127, rssi_dbm)),
+                          max(0, min(100, loss_pct)))
+    return _frame(MsgType.TELEMETRY, seq, 0, 1, payload)
+
+
+def decode_telemetry(payload: bytes) -> tuple[int, int, int, int, int]:
+    return struct.unpack(TELEMETRY_FMT, payload[:struct.calcsize(TELEMETRY_FMT)])
+
+
 def decode_delivery_request(payload: bytes) -> DeliveryRequest:
     return _unpack_delivery(payload)
 

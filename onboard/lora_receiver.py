@@ -40,12 +40,51 @@ class BaseLoRaReceiver:
         self._delivery_q: "queue.Queue" = queue.Queue()
         self.abort_requested = False
         self.peer_seq_start: Optional[int] = None   # BOOT_BEACON'dan
+        # M7 — link kalitesi telemetri
+        self._rx_window: list[float] = []   # son saniye paket varış zamanları
+        self.last_rssi: float = 0.0         # ESP32 desteklerse, opsiyonel
+        self.last_packet_seq: Optional[int] = None
+        self._expected_seq: Optional[int] = None
+        self._received_count: int = 0
+        self._missed_count: int = 0
 
     def _ingest(self, raw: bytes):
         for pkt in self.parser.feed(raw):
             self._handle_packet(pkt)
 
+    def _record_packet_stats(self, pkt: Packet) -> None:
+        """Paket varış zamanı + seq tabanlı kayıp istatistikleri."""
+        now = time.time()
+        self._rx_window.append(now)
+        cutoff = now - 1.0
+        while self._rx_window and self._rx_window[0] < cutoff:
+            self._rx_window.pop(0)
+        self._received_count += 1
+        seq = getattr(pkt, "seq", None)
+        if seq is not None:
+            if self._expected_seq is not None and seq > self._expected_seq:
+                self._missed_count += (seq - self._expected_seq)
+            self._expected_seq = seq + 1
+            self.last_packet_seq = seq
+
+    def rx_rate_hz(self) -> float:
+        return float(len(self._rx_window))
+
+    def packet_loss_pct(self) -> float:
+        tot = self._received_count + self._missed_count
+        return 0.0 if tot == 0 else 100.0 * self._missed_count / tot
+
+    def link_stats(self) -> dict:
+        return {
+            "rx_rate_hz": self.rx_rate_hz(),
+            "last_rssi": self.last_rssi,
+            "packet_loss_pct": self.packet_loss_pct(),
+            "received": self._received_count,
+            "missed": self._missed_count,
+        }
+
     def _handle_packet(self, pkt: Packet):
+        self._record_packet_stats(pkt)
         if pkt.msg_type == MsgType.BOOT_BEACON:
             # Peer reboot oldu — replay LRU resync (parser'da BOOT_BEACON
             # zaten replay-exempt). Sadece logla.
