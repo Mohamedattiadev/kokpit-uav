@@ -426,6 +426,12 @@ class Mission:
     def _do_disarm(self):
         self.drone.disarm()
         self.dropper.reset()
+        # Post-mortem: dataflash log'unu Jetson'a çek (donanım yoksa no-op).
+        try:
+            from log_downloader import download_latest_log
+            download_latest_log(self.drone, output_dir="runs", timeout_s=20.0)
+        except Exception as e:
+            print(f"[LOG] indirme atlandı: {e}")
         self.fsm.transition(MissionState.MISSION_COMPLETE, force=True)
 
     def _do_abort(self):
