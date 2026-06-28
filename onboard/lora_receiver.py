@@ -86,13 +86,16 @@ class BaseLoRaReceiver:
     def _handle_packet(self, pkt: Packet):
         self._record_packet_stats(pkt)
         if pkt.msg_type == MsgType.BOOT_BEACON:
-            # Peer reboot oldu — replay LRU resync (parser'da BOOT_BEACON
-            # zaten replay-exempt). Sadece logla.
+            # M10 — peer reboot: parser replay LRU yeni seq başlangıcı için reset.
             import struct
             try:
                 seq_start, fw = struct.unpack("<II", pkt.payload[:8])
                 self.peer_seq_start = seq_start
-                print(f"[LORA] BOOT_BEACON: peer seq_start={seq_start} fw={fw}")
+                self.parser._seen_set.clear()
+                self.parser._seen_seqs.clear()
+                self._expected_seq = None
+                print(f"[LORA] BOOT_BEACON: peer reboot detected, replay "
+                      f"window reset (seq_start={seq_start} fw={fw})")
             except Exception:
                 pass
         elif pkt.msg_type == MsgType.DELIVERY_REQUEST:
