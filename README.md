@@ -115,6 +115,22 @@ Failsafe katmanları (otomatik RTL veya LAND tetikler):
 
 ---
 
+## systemd (Jetson Auto-Restart)
+
+Jetson çöktüğünde otomatik restart için sdnotify tabanlı watchdog:
+
+```bash
+pip install sdnotify
+sudo cp systemd/kokpit-mc.service /etc/systemd/system/
+sudo systemctl enable kokpit-mc
+sudo systemctl start kokpit-mc
+journalctl -u kokpit-mc -f
+```
+
+Ana döngü her 5 sn `WATCHDOG=1`; 15 sn yanıt yoksa systemd servisi restart eder.
+
+---
+
 ## Lisans
 
 Bu proje [MIT lisansı](LICENSE) altında dağıtılmaktadır.

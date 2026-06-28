@@ -33,6 +33,7 @@ from autonomous_takeoff import autonomous_takeoff
 from state_machine import StateMachine, MissionState
 from packet_protocol import DeliveryRequest
 from lora_receiver import FaceDelivery
+from watchdog import Watchdog
 
 
 class Mission:
@@ -63,6 +64,7 @@ class Mission:
         self._failsafe_heap: list[tuple[int, float, str, str]] = []
         self._failsafe_lock = threading.Lock()
         self._cancel_event = threading.Event()   # phase task cancellation
+        self.watchdog = Watchdog(period_s=5.0)
 
     # =====================================================================
     # Kurulum
@@ -206,8 +208,10 @@ class Mission:
     def run(self) -> bool:
         self.fsm.transition(MissionState.WAIT_PACKET)
         mission_start: Optional[float] = None
+        self.watchdog.ready()
         try:
             while not self.fsm.is_terminal():
+                self.watchdog.notify()
                 st = self.fsm.state
 
                 # Genel abort denetimi (terminal/iniş durumları hariç)

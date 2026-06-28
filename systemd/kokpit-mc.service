@@ -1,0 +1,20 @@
+[Unit]
+Description=Kokpit Mission Controller (Jetson)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+WorkingDirectory=/opt/kokpit-uav
+Environment=KOKPIT_SIM=0
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -m onboard.mission
+Restart=on-failure
+RestartSec=3
+WatchdogSec=15
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
