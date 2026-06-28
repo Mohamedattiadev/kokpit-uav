@@ -116,7 +116,7 @@ Tamamlanan 12 ana modül:
 | M11 | CI doğrulama | requirements-ci.txt, 3 dk pipeline |
 | M12 | Arşimet sarmal | Sürekli velocity arama trajektorisi |
 
-**Donanım bekleyen 4 iş:**
+**Donanım bekleyen 4 iş** (detaylı adım adım plan → [`docs/DONANIM_PLANI.md`](docs/DONANIM_PLANI.md)):
 
 1. **TensorRT engine build.** Jetson Orin Nano + JetPack 6.x kurulduğunda `tools/build_face_trt.py` çalıştırılacak. Bu yapılmazsa yüz tanıma CPU üzerinde 1-2 FPS'te kalır (dlib fallback).
 2. **Extrinsics kalibrasyon.** Kamera + lidar gövdeye monte edildikten sonra cetvelle ölçü alınıp `tools/calibrate_extrinsics.py` ile kaydedilmeli. Yapılmazsa iniş 5-10 cm kayar.
