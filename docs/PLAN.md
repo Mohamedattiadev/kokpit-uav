@@ -89,7 +89,7 @@
 - **Geri uyumlu mod**: `recipient_id` da desteklenmeye devam etsin (config flag)
 - **Sorumlu:** Attia + Arda | **Tahmini:** 1 gün
 
-### P1.3 — TensorRT Yüz Tanıma (opsiyonel ama tavsiye)
+### P1.3 — TensorRT Yüz Tanıma ✅ TAMAM (M1)
 - Mevcut dlib `face_recognition` Jetson'da CPU only → hover'da 1–2 FPS, marjinal
 - ArcFace R50 ONNX → TensorRT FP16 (10+ FPS) — `onboard/face_verifier.py` opsiyonel backend
 - Engine cache: `{model}_{trt_version}_{jetpack}_{precision}.engine`
@@ -104,7 +104,7 @@
 - Test: SITL `LANDING_TARGET` inject, drone marker üzerine iner
 - **Sorumlu:** Arda | **Tahmini:** 6 sa
 
-### P1.5 — Yaw Alignment (delivery aşamasında)
+### P1.5 — Yaw Alignment (delivery aşamasında) ✅ TAMAM (M6)
 - APPROACHING sonunda ArUco rotation'dan ped yön referansı al
 - `mavlink.condition_yaw(target_heading)` ile drone yaw → ped yönüne
 - Alıcı drone'a değil, drone alıcıya bakar
@@ -119,7 +119,7 @@
 
 ## 🟢 SPRINT 3 — Operasyon Kalitesi (3 gün, P2)
 
-### P2.1 — Time Sync
+### P2.1 — Time Sync ✅ TAMAM (M3)
 - ESP32: NMEA `$GNRMC` UTC → RTC (`settimeofday`)
 - Jetson: MAVLink `SYSTEM_TIME` → `os.settimeofday` veya chrony
 - Tüm loglar `ts_unix_us` field'ı
@@ -137,28 +137,28 @@
 - CI'a entegre (zaten `.github/workflows/ci.yml` skeleton var)
 - **Sorumlu:** Arda | **Tahmini:** 1 gün
 
-### P2.4 — Log Download Otomasyonu
+### P2.4 — Log Download Otomasyonu ✅ TAMAM (M5)
 - Görev sonu Jetson Pixhawk dataflash log `LOG_REQUEST_LIST` + `LOG_REQUEST_DATA`
 - `runs/YYYYMMDD_HHMMSS/dataflash.bin` + `jetson.jsonl` + `merged.csv`
 - **Sorumlu:** Zeki | **Tahmini:** 4 sa
 
-### P2.5 — Watchdog + systemd
+### P2.5 — Watchdog + systemd ✅ TAMAM (M4)
 - `systemd/kokpit-mc.service` (Restart=on-failure, WatchdogSec=15)
 - `main.py` 5 sn'de bir `sd_notify("WATCHDOG=1")`
 - **Sorumlu:** Zeki | **Tahmini:** 2 sa
 
-### P2.6 — Extrinsics + Kalibrasyon
+### P2.6 — Extrinsics + Kalibrasyon ✅ TAMAM (M2)
 - `onboard/configs/extrinsics.yaml`: `cam_to_body`, `lidar_to_body` (x,y,z,rpy)
 - `tools/calibrate_extrinsics.py` interaktif rehber
 - `visual_servo.py` ve `sensor_fusion` pose hesabında transform uygula
 - **Sorumlu:** Arda | **Tahmini:** 4 sa
 
-### P2.7 — LoRa Link Telemetri (RSSI/SNR)
+### P2.7 — LoRa Link Telemetri (RSSI/SNR) ✅ TAMAM (M7)
 - ESP32 E32 register'larından RSSI oku → TELEMETRY paketinde
 - Jetson: dashboard'a yansıt
 - **Sorumlu:** Attia | **Tahmini:** 2 sa
 
-### P2.8 — Reboot Recovery
+### P2.8 — Reboot Recovery ✅ TAMAM (M8 + M9 PILOT_OVERRIDE + M10 BOOT_BEACON reset)
 - Jetson boot: MAVLink mode oku; AUTO/GUIDED/RTL aktif ise `MissionPhase.READ_ONLY`
 - **Sorumlu:** Arda | **Tahmini:** 2 sa
 

@@ -59,10 +59,13 @@ Listenin doldurulması saha test planını belirler. Tüm donanım yoksa SITL + 
 ### Q6 — Yüz Tanıma Backend → **(c) TensorRT default + dlib fallback**
 **Gerekçe:** Rapor 2.1.2 ve 3.3.1.2'de **"TensorRT destekli Evrişimli Sinir Ağları"** açıkça yazılı. TRT primary olmalı; dlib (mevcut `face_recognition`) Jetson hardware hazır olmadan geliştirme için fallback.
 
-**Uygulama (Sprint 2 P1.3 — KISMEN):**
-- TRT backend kod stub'u `onboard/face_verifier.py` içinde planlandı (Jetson hardware olmadan engine build edilemez).
-- TODO: ArcFace R50 ONNX → TensorRT FP16 engine build scripti (`tools/build_face_trt.py`). Engine cache key: `{model}_{trt}_{jetpack}_{precision}.engine`.
-- Dlib `face_recognition` mevcut, Jetson kurulumu olunca TRT'ye geçilecek.
+**Uygulama (Sprint 2 P1.3 — TAMAM):**
+- `onboard/face_verifier.py` `TRTBackend` (RetinaFace MnetV0.25 + ArcFace R50, 5-point align, cosine similarity, ArcFace 112x112).
+- `tools/build_face_trt.py` ONNX → TensorRT engine builder, cache key `{model}_{trt}_{jetpack}_{precision}.engine` (Jetson dışı graceful skip).
+- `KOKPIT_TRT_DIR` env override; engine yok/import yok → dlib `face_recognition` fallback + uyarı log'u.
+- `FaceVerifier(force_backend="trt")` API.
+- Test (`tests/test_face_trt.py`): engine lookup, missing-engine fallback, Jetson smoke.
+- Donanım TODO: gerçek `.engine` dosyaları Jetson Orin Nano üzerinde JetPack 6.x ile build edilmeli.
 
 ---
 
