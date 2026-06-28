@@ -123,6 +123,11 @@ class Mission:
         accel_spike_count = 0
         while self._monitor_running:
             t = self.drone.telemetry()
+            # M9 — Pilot manual modlara aldıysa Jetson çekil
+            if t.mode in ("MANUAL", "STABILIZE", "ACRO"):
+                self._push_failsafe(
+                    self.PRIO_USER_ABORT, "PILOT_OVERRIDE",
+                    f"Pilot kumandayı aldı (mode={t.mode})")
             # 1) CRASH detection — roll/pitch 45° veya |az| > 3g (debounced)
             if t.armed:
                 tilt_deg = max(abs(math.degrees(t.roll)),
