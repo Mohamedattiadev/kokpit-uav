@@ -363,6 +363,13 @@ INDEX_HTML = (BASE_CSS + """
   <p>Eşleşen kayıt yok.</p>
   </div>
 
+  {% if live_url %}
+  <div class="section-label" style="margin-top:36px">Live mission feed</div>
+  <div class="plot-card" style="padding:0;overflow:hidden">
+    <iframe src="{{ live_url }}" style="width:100%;height:480px;border:0;background:var(--bg-2)"></iframe>
+  </div>
+  {% endif %}
+
   <div class="section-label" style="margin-top:36px">All-time stats</div>
   <div class="stats" id="stats-block" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
     <div class="stat"><div class="stat-label">Total runs</div><div class="stat-value mono" id="s-total">—</div></div>
@@ -663,7 +670,8 @@ def _list_runs(runs_dir: Optional[Path] = None) -> list[dict]:
 
 @app.route("/")
 def index():
-    return render_template_string(INDEX_HTML, runs=_list_runs())
+    live_url = os.environ.get("KOKPIT_LIVE_URL", "")
+    return render_template_string(INDEX_HTML, runs=_list_runs(), live_url=live_url)
 
 
 @app.route("/run/<name>")
@@ -874,6 +882,41 @@ def api_stats():
         "total_flight_s": total_s,
         "success_rate_pct": round(rate, 1),
     })
+
+
+@app.route("/run/<name>/report.md")
+def run_report_md(name):
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    d = RUNS_DIR / safe
+    if not d.exists():
+        abort(404)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from make_report import build_report_md
+    from flask import Response
+    return Response(build_report_md(d), mimetype="text/markdown")
+
+
+@app.route("/run/<name>/track.tlog")
+def run_tlog(name):
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    d = RUNS_DIR / safe
+    tel = d / "telemetry.csv"
+    if not tel.exists():
+        abort(404)
+    sys.path.insert(0, str(ROOT / "tools"))
+    try:
+        from csv_to_tlog import csv_to_tlog
+        out = d / "track.tlog"
+        csv_to_tlog(tel, out)
+        from flask import send_file
+        return send_file(out, mimetype="application/octet-stream",
+                         as_attachment=True, download_name=f"{safe}.tlog")
+    except ImportError:
+        abort(503)
 
 
 @app.route("/run/<name>/download.zip")
