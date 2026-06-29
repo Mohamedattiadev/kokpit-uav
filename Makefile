@@ -1,4 +1,4 @@
-.PHONY: help install test demo sitl lint clean
+.PHONY: help install test demo sitl lint clean print-card
 
 help:
 	@echo "Kokpit UAV — make targets"
@@ -7,7 +7,16 @@ help:
 	@echo "  demo         software demo (no hardware, no ArduPilot)"
 	@echo "  sitl         ArduCopter SITL end-to-end mission"
 	@echo "  lint         ruff check"
+	@echo "  print-card   docs/SAHA_KART.md -> PDF (pandoc varsa)"
 	@echo "  clean        remove caches"
+
+print-card:
+	@if command -v pandoc >/dev/null 2>&1; then \
+	  pandoc docs/SAHA_KART.md -o docs/SAHA_KART.pdf -V geometry:margin=1cm; \
+	  echo "OK: docs/SAHA_KART.pdf"; \
+	else \
+	  echo "pandoc yok — md görüntüle: cat docs/SAHA_KART.md"; \
+	fi
 
 install:
 	pip install -r requirements.txt
