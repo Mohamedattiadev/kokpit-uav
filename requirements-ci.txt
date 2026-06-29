@@ -8,3 +8,6 @@ cryptography>=41.0          # AES-128-CCM için
 pytest>=7.0
 pytest-timeout>=2.1
 ruff
+flask>=3.0
+matplotlib>=3.7
+requests>=2.28
