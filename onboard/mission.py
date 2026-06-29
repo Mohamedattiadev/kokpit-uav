@@ -106,6 +106,19 @@ class Mission:
         n = self.verifier.load_dataset()
         if n == 0:
             print("[GÖREV] UYARI: kayıtlı yüz yok — biyometrik doğrulama başarısız olur")
+        # N4 — telemetry recorder
+        self._recorder = None
+        if not CFG.simulation or os.environ.get("KOKPIT_RECORD") == "1":
+            try:
+                from telemetry_recorder import TelemetryRecorder
+                self._recorder = TelemetryRecorder(
+                    telemetry_provider=lambda: self.drone.telemetry(),
+                    mission_state_provider=lambda: self.fsm.state.name,
+                    failsafe_provider=lambda: bool(self._failsafe_heap),
+                )
+                self._recorder.start()
+            except Exception as e:
+                print(f"[GÖREV] recorder başlatılamadı: {e}")
         self._start_failsafe_monitor()
 
     def _ensure_camera(self):
@@ -522,6 +535,12 @@ class Mission:
 
     def close(self):
         self._monitor_running = False
+        rec = getattr(self, "_recorder", None)
+        if rec:
+            try:
+                rec.close()
+            except Exception:
+                pass
         try:
             if self.camera:
                 self.camera.release()
