@@ -173,16 +173,58 @@ body {
   border-color: var(--border-strong);
   background: var(--bg-2);
 }
-.card h3 {
-  margin: 0 0 6px;
-  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
-  font-family: 'JetBrains Mono', monospace;
+.card-head {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px;
 }
-.card-meta { color: var(--text-soft); font-size: 12px; }
-.card-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
-.card-stats { display: flex; gap: 14px; font-size: 12px; color: var(--text-dim); }
-.card-stats span { display: inline-flex; align-items: center; gap: 5px; }
-.card-stats svg { color: var(--text-soft); }
+.card-head .when {
+  font-size: 11px; color: var(--text-soft);
+}
+.card h3 {
+  margin: 0 0 12px;
+  font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+  font-family: 'JetBrains Mono', monospace;
+  color: var(--text);
+  word-break: break-all;
+}
+.card-headline {
+  font-size: 14px; font-weight: 500; color: var(--text);
+  margin-bottom: 12px; line-height: 1.4;
+}
+.card-mini-stepper {
+  display: flex; gap: 4px; margin-bottom: 14px;
+}
+.card-mini-stepper .ms {
+  flex: 1; height: 3px; border-radius: 2px;
+  background: var(--bg-3);
+}
+.card-mini-stepper .ms.done { background: var(--ok); }
+.card-mini-stepper .ms.err { background: var(--err); }
+.card-kpis {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 8px; margin-bottom: 12px;
+}
+.card-kpi {
+  display: flex; flex-direction: column; gap: 2px;
+}
+.card-kpi-label {
+  font-size: 10px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: .08em;
+  font-weight: 600;
+}
+.card-kpi-value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 14px; font-weight: 600; color: var(--text);
+}
+.card-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  padding-top: 10px; border-top: 1px solid var(--border);
+  font-size: 11px; color: var(--text-soft);
+}
+.card-foot .recipient {
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.card-foot svg { width: 12px; height: 12px; }
 
 .chip {
   display: inline-flex; align-items: center; gap: 5px;
@@ -391,19 +433,16 @@ INDEX_HTML = (BASE_CSS + """
     <span>Kokpit</span>
     <span class="brand-sub">Mission Replay</span>
   </a>
-  <div class="nav-meta" style="display:flex;gap:16px;align-items:center">
-    <span><span id="nav-count">{{ runs|length }}</span> {{ i18n.runs_word }}</span>
-    <span>·</span>
-    <span><span style="display:inline-block;width:6px;height:6px;background:#3fb950;border-radius:50%;margin-right:5px;animation:pulse 1.6s infinite"></span>{{ i18n.live }}</span>
-    <span>·</span>
+  <div class="nav-meta">
+    <span class="nav-chip">""" + ICON["activity"] + """<span id="nav-count">{{ runs|length }}</span> {{ i18n.runs_word }}</span>
+    <span class="nav-chip live"><span class="live-dot"></span>{{ i18n.live }}</span>
     <div class="lang-switch">
       <a href="?lang=tr" class="{{ 'active' if lang == 'tr' else '' }}">TR</a>
       <a href="?lang=en" class="{{ 'active' if lang == 'en' else '' }}">EN</a>
     </div>
-    <span>Teknofest 2026</span>
+    <span class="nav-brand-chip">Teknofest 2026</span>
   </div>
 </div></nav>
-<style>@keyframes pulse {0%,100%{opacity:1}50%{opacity:.3}}</style>
 
 <div class="wrap">
   <h1 class="page-title">{{ i18n.title }}</h1>
@@ -495,26 +534,81 @@ INDEX_HTML = (BASE_CSS + """
 <script>
 const LANG = {{ lang|tojson }};
 const T = {
-  delivered: LANG === 'en' ? 'delivered' : 'teslim edildi',
-  incomplete: LANG === 'en' ? 'incomplete' : 'tamamlanmadı',
+  delivered: LANG === 'en' ? 'Delivered' : 'Teslim edildi',
+  incomplete: LANG === 'en' ? 'Incomplete' : 'Tamamlanmadı',
   mission: LANG === 'en' ? 'mission' : 'görev',
+  duration: LANG === 'en' ? 'Duration' : 'Süre',
+  max_alt: LANG === 'en' ? 'Max alt' : 'Max irtifa',
+  battery: LANG === 'en' ? 'Battery' : 'Batarya',
+  recipient: LANG === 'en' ? 'recipient' : 'alıcı',
+  head_ok: LANG === 'en' ? 'Package delivered successfully' : 'Paket başarıyla teslim edildi',
+  head_inc: LANG === 'en' ? 'Mission did not complete' : 'Görev tamamlanmadı',
+  ago_now: LANG === 'en' ? 'just now' : 'az önce',
+  ago_min: LANG === 'en' ? 'min ago' : 'dk önce',
+  ago_hr: LANG === 'en' ? 'hr ago' : 'sa önce',
+  ago_day: LANG === 'en' ? 'days ago' : 'gün önce',
 };
+const ABORT_TR = {
+  BATTERY_LOW: LANG === 'en' ? 'Battery low' : 'Batarya zayıf',
+  LINK_LOST: LANG === 'en' ? 'Link lost' : 'İletişim koptu',
+  GPS_LOST: LANG === 'en' ? 'GPS lost' : 'GPS kayboldu',
+  MARKER_LOST: LANG === 'en' ? 'Marker lost' : 'İşaret kayboldu',
+  FACE_MISMATCH: LANG === 'en' ? 'Face mismatch' : 'Yüz eşleşmedi',
+};
+const ABORT_HEAD = {
+  BATTERY_LOW: LANG === 'en' ? 'Aborted due to low battery' : 'Batarya zayıfladığı için iptal',
+  LINK_LOST: LANG === 'en' ? 'Aborted due to lost link' : 'İletişim koptuğu için iptal',
+  GPS_LOST: LANG === 'en' ? 'Aborted due to lost GPS' : 'GPS kaybolduğu için iptal',
+  MARKER_LOST: LANG === 'en' ? 'Aborted: marker lost' : 'İşaret bulunamadığı için iptal',
+  FACE_MISMATCH: LANG === 'en' ? 'Aborted: face did not match' : 'Yüz eşleşmediği için iptal',
+};
+function relTime(ts) {
+  if (!ts) return '';
+  const diff = (Date.now() / 1000) - ts;
+  if (diff < 60) return T.ago_now;
+  if (diff < 3600) return `${Math.floor(diff / 60)} ${T.ago_min}`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} ${T.ago_hr}`;
+  return `${Math.floor(diff / 86400)} ${T.ago_day}`;
+}
+function fmtDur(s) {
+  const m = Math.floor(s / 60), sec = s % 60;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
 let _filter = 'all', _query = '', _runs = [];
+const FLOW = ['marker_locked', 'face_matched', 'delivered', 'rtl_done'];
 const card = r => {
   const cls = r.delivered ? 'ok' : (r.abort_reason ? 'err' : 'warn');
   const chip = r.delivered
     ? `<span class="chip ok">""" + ICON["package"] + """ ${T.delivered}</span>`
     : r.abort_reason
-    ? `<span class="chip err">""" + ICON["octagon_x"] + """ ${r.abort_reason}</span>`
+    ? `<span class="chip err">""" + ICON["octagon_x"] + """ ${ABORT_TR[r.abort_reason] || r.abort_reason}</span>`
     : `<span class="chip warn">${T.incomplete}</span>`;
+  const headline = r.delivered ? T.head_ok :
+    (r.abort_reason ? (ABORT_HEAD[r.abort_reason] || r.abort_reason) : T.head_inc);
+  // mini progress: 4 steps (marker / face / delivered / rtl)
+  const steps = FLOW.map(k => {
+    if (r[k]) return '<div class="ms done"></div>';
+    if (r.abort_reason) return '<div class="ms err"></div>';
+    return '<div class="ms"></div>';
+  }).join('');
+  // foot
+  const footLeft = r.delivered && r.recipient_id != null
+    ? `""" + ICON["user_check"] + """ ${T.recipient} #${r.recipient_id}`
+    : (r.abort_reason ? `""" + ICON["alert"] + """ ${r.abort_reason}` : '');
   return `<a class="card ${cls}" href="/run/${r.name}?lang=${LANG}">
+    <div class="card-head">${chip}<span class="when">${relTime(r.ts)}</span></div>
+    <div class="card-headline">${headline}</div>
+    <div class="card-mini-stepper">${steps}</div>
+    <div class="card-kpis">
+      <div class="card-kpi"><div class="card-kpi-label">${T.duration}</div><div class="card-kpi-value">${fmtDur(r.duration_s)}</div></div>
+      <div class="card-kpi"><div class="card-kpi-label">${T.max_alt}</div><div class="card-kpi-value">${(r.max_alt||0).toFixed(0)}m</div></div>
+      <div class="card-kpi"><div class="card-kpi-label">${T.battery}</div><div class="card-kpi-value">${(r.battery_drop||0).toFixed(1)}V</div></div>
+    </div>
     <h3>${r.name}</h3>
-    <div class="card-meta">${r.duration_s}s ${T.mission}</div>
-    <div class="card-row">
-      <div class="card-stats">
-        <span>""" + ICON["clock"] + """ ${r.duration_s}s</span>
-        <span>""" + ICON["activity"] + """ ${r.telemetry_rows}</span>
-      </div>${chip}</div></a>`;
+    <div class="card-foot">
+      <span class="recipient">${footLeft}</span>
+    </div>
+  </a>`;
 };
 
 const match = r => {
@@ -698,19 +792,68 @@ RUN_HTML = (BASE_CSS + """
   .step:nth-child(4)::after { display: none; }
 }
 
-/* Lang switcher */
+/* Lang switcher (segmented control) */
 .lang-switch {
   display: inline-flex; background: var(--bg-2);
-  border: 1px solid var(--border); border-radius: 6px;
-  padding: 2px;
+  border: 1px solid var(--border); border-radius: 7px;
+  padding: 2px; gap: 2px;
+}
+.lang-switch a, .lang-switch a:visited, .lang-switch a:hover, .lang-switch a:active {
+  text-decoration: none !important;
 }
 .lang-switch a {
-  padding: 4px 10px; font-size: 11px; font-weight: 600;
-  text-decoration: none; color: var(--text-soft);
-  border-radius: 4px; transition: all .15s;
+  padding: 4px 12px; font-size: 11px; font-weight: 700;
+  letter-spacing: .05em;
+  color: var(--text-soft);
+  border-radius: 5px;
+  transition: all .12s ease;
+  font-family: 'Inter', sans-serif;
 }
-.lang-switch a.active { background: var(--accent-soft); color: var(--accent); }
-.lang-switch a:hover:not(.active) { color: var(--text); }
+.lang-switch a.active {
+  background: var(--accent);
+  color: #0d1117;
+  box-shadow: 0 1px 2px rgba(88,166,255,.3);
+}
+.lang-switch a:hover:not(.active) { color: var(--text); background: var(--bg-3); }
+
+/* Nav meta chips */
+.nav-meta {
+  display: flex; gap: 10px; align-items: center;
+  font-size: 12px;
+}
+.nav-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 7px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text-dim); font-weight: 500;
+}
+.nav-chip svg { width: 12px; height: 12px; color: var(--text-soft); }
+.nav-chip.live {
+  background: rgba(63,185,80,.08);
+  border-color: rgba(63,185,80,.25);
+  color: var(--ok);
+}
+.nav-chip.live .live-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--ok); position: relative;
+}
+.nav-chip.live .live-dot::after {
+  content: ""; position: absolute; inset: -3px;
+  border-radius: 50%; background: var(--ok);
+  opacity: .35; animation: livepulse 1.8s infinite;
+}
+@keyframes livepulse {
+  0%   { transform: scale(0.6); opacity: .5; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+.nav-brand-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 7px;
+  background: linear-gradient(135deg, rgba(88,166,255,.10), rgba(163,113,247,.10));
+  border: 1px solid rgba(88,166,255,.20);
+  color: var(--text); font-weight: 600;
+  font-size: 11px; letter-spacing: .04em;
+}
 
 /* Map playback */
 .map-controls {
@@ -834,12 +977,12 @@ RUN_HTML = (BASE_CSS + """
     <span>Kokpit</span>
     <span class="brand-sub">Mission Replay</span>
   </a>
-  <div class="nav-meta" style="display:flex;gap:16px;align-items:center">
+  <div class="nav-meta">
     <div class="lang-switch">
       <a href="?lang=tr" class="{{ 'active' if lang == 'tr' else '' }}">TR</a>
       <a href="?lang=en" class="{{ 'active' if lang == 'en' else '' }}">EN</a>
     </div>
-    <span>Teknofest 2026</span>
+    <span class="nav-brand-chip">Teknofest 2026</span>
   </div>
 </div></nav>
 
@@ -1306,8 +1449,14 @@ def _telemetry_stats(d: Path) -> dict:
 
 
 def _summarize_run(d: Path) -> dict:
-    info = {"name": d.name, "duration_s": 0, "delivered": False,
-            "abort_reason": "", "telemetry_rows": 0}
+    import csv
+    info = {
+        "name": d.name, "duration_s": 0, "delivered": False,
+        "abort_reason": "", "telemetry_rows": 0,
+        "ts": None, "max_alt": 0.0, "battery_drop": 0.0,
+        "recipient_id": None, "marker_locked": False,
+        "face_matched": False, "rtl_done": False,
+    }
     ev = d / "events.jsonl"
     if ev.exists():
         first = last = None
@@ -1321,15 +1470,46 @@ def _summarize_run(d: Path) -> dict:
                 if first is None:
                     first = t
                 last = t
-            if j.get("event") == "package_delivered":
+            name = j.get("event")
+            if name == "package_delivered":
                 info["delivered"] = True
-            if j.get("event") == "abort":
+                if "recipient_id" in j:
+                    info["recipient_id"] = j["recipient_id"]
+            elif name == "abort":
                 info["abort_reason"] = j.get("reason", "abort")
+            elif name == "marker_locked":
+                info["marker_locked"] = True
+            elif name == "face_match":
+                info["face_matched"] = True
+            elif name in ("rtl_complete", "mission_end"):
+                info["rtl_done"] = True
         if first is not None and last is not None:
             info["duration_s"] = max(0, int(last - first))
+            info["ts"] = first
     tel = d / "telemetry.csv"
     if tel.exists():
-        info["telemetry_rows"] = max(0, len(tel.read_text().splitlines()) - 1)
+        alts = []
+        bats = []
+        try:
+            with tel.open() as f:
+                for row in csv.DictReader(f):
+                    try:
+                        alts.append(float(row["alt_rel"]))
+                        bats.append(float(row["battery_v"]))
+                    except Exception:
+                        continue
+        except Exception:
+            pass
+        info["telemetry_rows"] = len(alts)
+        if alts:
+            info["max_alt"] = max(alts)
+        if bats:
+            info["battery_drop"] = bats[0] - bats[-1]
+    if info["ts"] is None:
+        try:
+            info["ts"] = d.stat().st_mtime
+        except Exception:
+            info["ts"] = 0
     return info
 
 
