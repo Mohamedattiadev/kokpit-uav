@@ -87,6 +87,31 @@ def status():
     return jsonify(_latest_status)
 
 
+# #12 — health endpoint: bileşen durumu (mavlink, lora, recorder, camera, ekf)
+_health_providers: dict = {}
+
+
+def register_health(name: str, provider) -> None:
+    """provider() -> (ok: bool, detail: str)"""
+    _health_providers[name] = provider
+
+
+@app.route("/health")
+def health():
+    out = {"ok": True, "components": {}}
+    for name, fn in _health_providers.items():
+        try:
+            ok, detail = fn()
+        except Exception as e:
+            ok, detail = False, f"exc: {e}"
+        out["components"][name] = {"ok": ok, "detail": detail}
+        if not ok:
+            out["ok"] = False
+    if not out["components"]:
+        out["components"]["_"] = {"ok": True, "detail": "no providers registered"}
+    return jsonify(out)
+
+
 @app.route("/")
 @_basic_auth_required
 def index():
