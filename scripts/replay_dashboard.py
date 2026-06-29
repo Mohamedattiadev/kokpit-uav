@@ -434,8 +434,6 @@ INDEX_HTML = (BASE_CSS + """
     <span class="brand-sub">Mission Replay</span>
   </a>
   <div class="nav-meta">
-    <span class="nav-chip">""" + ICON["activity"] + """<span id="nav-count">{{ runs|length }}</span> {{ i18n.runs_word }}</span>
-    <span class="nav-chip live"><span class="live-dot"></span>{{ i18n.live }}</span>
     <div class="lang-switch">
       <a href="?lang=tr" class="{{ 'active' if lang == 'tr' else '' }}">TR</a>
       <a href="?lang=en" class="{{ 'active' if lang == 'en' else '' }}">EN</a>
@@ -798,23 +796,29 @@ RUN_HTML = (BASE_CSS + """
   border: 1px solid var(--border); border-radius: 7px;
   padding: 2px; gap: 2px;
 }
-.lang-switch a, .lang-switch a:visited, .lang-switch a:hover, .lang-switch a:active {
-  text-decoration: none !important;
-}
-.lang-switch a {
-  padding: 4px 12px; font-size: 11px; font-weight: 700;
+.lang-switch a,
+.lang-switch a:link,
+.lang-switch a:visited {
+  padding: 4px 12px;
+  font-size: 11px; font-weight: 700;
   letter-spacing: .05em;
-  color: var(--text-soft);
+  color: var(--text-soft) !important;
   border-radius: 5px;
+  text-decoration: none !important;
   transition: all .12s ease;
   font-family: 'Inter', sans-serif;
 }
-.lang-switch a.active {
+.lang-switch a.active,
+.lang-switch a.active:link,
+.lang-switch a.active:visited {
   background: var(--accent);
-  color: #0d1117;
+  color: #0d1117 !important;
   box-shadow: 0 1px 2px rgba(88,166,255,.3);
 }
-.lang-switch a:hover:not(.active) { color: var(--text); background: var(--bg-3); }
+.lang-switch a:hover:not(.active) {
+  color: var(--text) !important;
+  background: var(--bg-3);
+}
 
 /* Nav meta chips */
 .nav-meta {
