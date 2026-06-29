@@ -1,0 +1,8 @@
+[Unit]
+Description=Kokpit runs/ archive job
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/jetson/kokpit-uav
+ExecStart=/usr/bin/python3 scripts/runs_index.py --archive
+User=jetson

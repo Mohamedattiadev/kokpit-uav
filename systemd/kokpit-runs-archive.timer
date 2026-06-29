@@ -1,0 +1,9 @@
+[Unit]
+Description=Kokpit runs/ aylık arşivleme (30+ gün eski log'lar)
+
+[Timer]
+OnCalendar=monthly
+Persistent=true
+
+[Install]
+WantedBy=timers.target
