@@ -614,46 +614,106 @@ RUN_HTML = (BASE_CSS + """
 }
 .kpi-sub { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
 
-/* Phase stepper */
+/* Phase stepper (fit width, no scroll) */
 .stepper {
-  display: flex; align-items: center;
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
   background: var(--bg-1);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 18px 20px;
+  padding: 16px 18px;
   margin-bottom: 14px;
-  overflow-x: auto;
 }
 .step {
-  display: flex; align-items: center;
-  flex-shrink: 0; gap: 10px;
-  padding-right: 20px; position: relative;
+  display: flex; flex-direction: column;
+  align-items: center; gap: 8px;
+  position: relative; min-width: 0;
 }
 .step:not(:last-child)::after {
-  content: ""; width: 28px; height: 2px;
-  background: var(--border);
-  margin-left: 10px;
-  display: inline-block;
+  content: ""; position: absolute;
+  top: 16px; left: calc(50% + 18px);
+  right: calc(-50% + 18px);
+  height: 2px; background: var(--border);
 }
 .step.done:not(:last-child)::after { background: var(--ok); }
 .step-circle {
-  width: 28px; height: 28px; border-radius: 50%;
+  width: 32px; height: 32px; border-radius: 50%;
   display: grid; place-items: center;
   background: var(--bg-3); border: 1.5px solid var(--border);
-  color: var(--text-soft); flex-shrink: 0;
+  color: var(--text-soft); position: relative; z-index: 1;
+  font-size: 14px; font-weight: 700;
 }
 .step.done .step-circle { background: var(--ok); border-color: var(--ok); color: #0d1117; }
 .step.current .step-circle { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); animation: pulse 1.8s infinite; }
 .step.err .step-circle { background: var(--err-soft); border-color: var(--err); color: var(--err); }
 .step-label {
-  font-size: 12px; font-weight: 500;
-  color: var(--text-soft); white-space: nowrap;
+  font-size: 11px; font-weight: 500;
+  color: var(--text-soft);
+  text-align: center; line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden; text-overflow: ellipsis;
 }
-.step.done .step-label, .step.current .step-label { color: var(--text); }
-.step.err .step-label { color: var(--err); }
+.step.done .step-label, .step.current .step-label { color: var(--text); font-weight: 600; }
+.step.err .step-label { color: var(--err); font-weight: 600; }
 @keyframes pulse {
   0%, 100% { box-shadow: 0 0 0 0 rgba(88,166,255,.4); }
   50%      { box-shadow: 0 0 0 8px rgba(88,166,255,0); }
+}
+@media (max-width: 700px) {
+  .stepper { grid-template-columns: repeat(4, 1fr); row-gap: 16px; }
+  .step:nth-child(4)::after { display: none; }
+}
+
+/* Lang switcher */
+.lang-switch {
+  display: inline-flex; background: var(--bg-2);
+  border: 1px solid var(--border); border-radius: 6px;
+  padding: 2px;
+}
+.lang-switch a {
+  padding: 4px 10px; font-size: 11px; font-weight: 600;
+  text-decoration: none; color: var(--text-soft);
+  border-radius: 4px; transition: all .15s;
+}
+.lang-switch a.active { background: var(--accent-soft); color: var(--accent); }
+.lang-switch a:hover:not(.active) { color: var(--text); }
+
+/* Map playback */
+.map-controls {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  background: var(--bg-2);
+}
+.play-btn {
+  width: 32px; height: 32px;
+  border-radius: 50%; border: 0;
+  background: var(--accent); color: #0d1117;
+  cursor: pointer; display: grid; place-items: center;
+  transition: transform .12s;
+}
+.play-btn:hover { transform: scale(1.08); }
+.play-btn svg { width: 14px; height: 14px; stroke-width: 2.5; }
+.scrub {
+  flex: 1; min-width: 0;
+  -webkit-appearance: none; appearance: none;
+  height: 4px; background: var(--bg-3);
+  border-radius: 2px; outline: none;
+}
+.scrub::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); cursor: pointer;
+}
+.scrub::-moz-range-thumb {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--accent); cursor: pointer; border: 0;
+}
+.scrub-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text-soft);
+  min-width: 64px; text-align: right;
 }
 
 /* Timeline (cleaner cards) */
@@ -741,11 +801,17 @@ RUN_HTML = (BASE_CSS + """
     <span>Kokpit</span>
     <span class="brand-sub">Mission Replay</span>
   </a>
-  <div class="nav-meta"><span>Teknofest 2026</span></div>
+  <div class="nav-meta" style="display:flex;gap:16px;align-items:center">
+    <div class="lang-switch">
+      <a href="?lang=tr" class="{{ 'active' if lang == 'tr' else '' }}">TR</a>
+      <a href="?lang=en" class="{{ 'active' if lang == 'en' else '' }}">EN</a>
+    </div>
+    <span>Teknofest 2026</span>
+  </div>
 </div></nav>
 
 <div class="wrap">
-  <a class="back" href="/">""" + ICON["arrow_left"] + """ Tüm görevler</a>
+  <a class="back" href="/">""" + ICON["arrow_left"] + """ {{ i18n.back }}</a>
 
   <!-- HERO: status + name + headline + summary -->
   {% set tone = 'ok' if delivered else ('err' if abort_reason else 'warn') %}
@@ -753,70 +819,70 @@ RUN_HTML = (BASE_CSS + """
     <div class="hero-row">
       <div class="hero-left">
         <div class="hero-status">
-          {% if delivered %}""" + ICON["package"] + """ <span>Başarılı teslimat</span>
-          {% elif abort_reason %}""" + ICON["octagon_x"] + """ <span>Görev iptal — {{ abort_reason }}</span>
-          {% else %}""" + ICON["alert"] + """ <span>Tamamlanamadı</span>{% endif %}
+          {% if delivered %}""" + ICON["package"] + """ <span>{{ i18n.delivered }}</span>
+          {% elif abort_reason %}""" + ICON["octagon_x"] + """ <span>{{ i18n.abort }} — {{ abort_reason }}</span>
+          {% else %}""" + ICON["alert"] + """ <span>{{ i18n.incomplete }}</span>{% endif %}
         </div>
         <div class="hero-name">{{ name }}</div>
         <h1 class="hero-headline">
-          {% if delivered %}Paket başarıyla teslim edildi.
-          {% elif abort_reason %}Görev güvenlik nedeniyle iptal edildi.
-          {% else %}Görev tamamlanamadı.{% endif %}
+          {% if delivered %}{{ i18n.headline_ok }}
+          {% elif abort_reason %}{{ i18n.headline_err }}
+          {% else %}{{ i18n.headline_warn }}{% endif %}
         </h1>
         <p class="hero-desc">{{ human_summary }}</p>
       </div>
       <div class="hero-actions">
-        <a href="/run/{{ name }}/download.zip" class="btn">⬇ Verileri indir</a>
-        <a href="/run/{{ name }}/report.md" class="btn" target="_blank">📄 Rapor</a>
+        <a href="/run/{{ name }}/download.zip" class="btn">""" + ICON["arrow_down"] + """ {{ i18n.download }}</a>
+        <a href="/run/{{ name }}/report.html" class="btn" target="_blank">📄 {{ i18n.report }}</a>
         <select id="compare-pick" class="btn" style="appearance:none;padding-right:24px">
-          <option value="">⇄ Karşılaştır…</option>
+          <option value="">⇄ {{ i18n.compare }}</option>
         </select>
       </div>
     </div>
   </div>
 
-  <!-- Phase stepper -->
-  <div class="stepper" id="stepper">Yükleniyor…</div>
+  <!-- Phase stepper (fit, no scroll) -->
+  <div class="stepper" id="stepper" data-flow="{{ i18n.stepper|tojson|safe }}">Yükleniyor…</div>
 
   <!-- KPI cards -->
   <div class="kpis">
     <div class="kpi">
       <div class="kpi-icon">""" + ICON["clock"] + """</div>
-      <div class="kpi-label">Süre</div>
+      <div class="kpi-label">{{ i18n.duration }}</div>
       <div class="kpi-value">{{ '%d:%02d'|format(duration_s // 60, duration_s % 60) }}</div>
-      <div class="kpi-sub">dakika:saniye</div>
+      <div class="kpi-sub">{{ i18n.duration_sub }}</div>
     </div>
     <div class="kpi">
       <div class="kpi-icon">""" + ICON["plane_up"] + """</div>
-      <div class="kpi-label">En yüksek irtifa</div>
+      <div class="kpi-label">{{ i18n.max_alt }}</div>
       <div class="kpi-value">{{ '%.0f'|format(tel_stats.max_alt or 0) }} m</div>
-      <div class="kpi-sub">yerden uzaklık</div>
+      <div class="kpi-sub">{{ i18n.max_alt_sub }}</div>
     </div>
     <div class="kpi">
       <div class="kpi-icon">""" + ICON["activity"] + """</div>
-      <div class="kpi-label">Olay</div>
+      <div class="kpi-label">{{ i18n.events_lbl }}</div>
       <div class="kpi-value">{{ events|length }}</div>
-      <div class="kpi-sub">kaydedilen aşama</div>
+      <div class="kpi-sub">{{ i18n.events_sub }}</div>
     </div>
     <div class="kpi">
       <div class="kpi-icon">""" + ICON["satellite"] + """</div>
-      <div class="kpi-label">Batarya harcaması</div>
+      <div class="kpi-label">{{ i18n.battery }}</div>
       <div class="kpi-value">{{ '%.1f'|format(tel_stats.battery_drop or 0) }} V</div>
-      <div class="kpi-sub">başlangıçtan sona</div>
+      <div class="kpi-sub">{{ i18n.battery_sub }}</div>
     </div>
   </div>
 
   <!-- 2-column: timeline+plot | map -->
   <div class="two-col">
     <div>
-      <div class="section-label">Görev aşamaları</div>
+      <div class="section-label">{{ i18n.phases_title }}</div>
       <div class="panel">
-        <div class="panel-hint">Görev her aşamada ne kadar zaman geçirdi:</div>
+        <div class="panel-hint">{{ i18n.phases_hint }}</div>
         <div id="phases"></div>
         <div id="phase-legend" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text-dim)"></div>
       </div>
 
-      <div class="section-label">Olaylar</div>
+      <div class="section-label">{{ i18n.events_title }}</div>
       <div class="tl-card">
         {% for e in events %}
         <div class="tl-row">
@@ -831,25 +897,30 @@ RUN_HTML = (BASE_CSS + """
       </div>
 
       {% if tel_rows > 0 %}
-      <div class="section-label">İrtifa ve batarya</div>
+      <div class="section-label">{{ i18n.plot_title }}</div>
       <div class="panel" style="padding:0;overflow:hidden">
-        <img src="/run/{{ name }}/plot.png" alt="plot" style="width:100%;display:block"/>
+        <img src="/run/{{ name }}/plot.png?lang={{ lang }}" alt="plot" style="width:100%;display:block"/>
       </div>
 
-      <div class="section-label">Güvenlik uyarıları</div>
-      <div class="panel" id="failsafe-panel" style="font-size:13px">Yükleniyor…</div>
+      <div class="section-label">{{ i18n.safety_title }}</div>
+      <div class="panel" id="failsafe-panel" data-clear="{{ i18n.safety_clear }}" style="font-size:13px">…</div>
       {% endif %}
     </div>
 
     {% if tel_rows > 0 %}
     <aside>
-      <div class="section-label" style="margin-top:0">Uçuş rotası</div>
+      <div class="section-label" style="margin-top:0">{{ i18n.route_title }}</div>
       <div class="map-card">
-        <div id="map" style="height:560px;background:var(--bg-2)"></div>
+        <div id="map" style="height:520px;background:var(--bg-2)"></div>
+        <div class="map-controls">
+          <button class="play-btn" id="play-btn" title="{{ i18n.playback }}">""" + ICON["play"] + """</button>
+          <input type="range" class="scrub" id="scrub" min="0" max="100" value="0"/>
+          <span class="scrub-time" id="scrub-time">0:00 / 0:00</span>
+        </div>
         <div class="map-legend">
-          <span><span class="dot" style="background:#3fb950"></span>Başlangıç</span>
-          <span><span class="dot" style="background:#d29922"></span>Bitiş</span>
-          <span><span class="dot" style="background:#58a6ff;width:14px;height:2px;border-radius:0"></span>Uçuş yolu</span>
+          <span><span class="dot" style="background:#3fb950"></span>{{ i18n.legend_start }}</span>
+          <span><span class="dot" style="background:#d29922"></span>{{ i18n.legend_end }}</span>
+          <span><span class="dot" style="background:#58a6ff;width:14px;height:2px;border-radius:0"></span>{{ i18n.legend_path }}</span>
         </div>
       </div>
     </aside>
@@ -860,27 +931,85 @@ RUN_HTML = (BASE_CSS + """
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script>
+const LANG = {{ lang|tojson }};
 (async function(){
   const name = {{ name|tojson }};
-  // Track / map
+  // Track / map with playback
   try {
     const r = await fetch(`/run/${name}/track.json`);
     const data = await r.json();
-    if (data.points && data.points.length) {
+    const mapEl = document.getElementById('map');
+    if (!data.points || !data.points.length) {
+      mapEl.innerHTML = '<div style="padding:60px 20px;text-align:center;color:var(--text-soft);font-size:13px">' +
+        (LANG === 'en' ? 'No GPS track for this mission.' : 'Konum verisi yok (GPS sinyali olmadan kaydedilmiş).') +
+        '</div>';
+    } else {
       const pts = data.points.map(p => [p.lat, p.lon]);
       const map = L.map('map', { zoomControl: true, attributionControl: false });
       L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
         maxZoom: 19, subdomains: 'abcd'
       }).addTo(map);
-      const line = L.polyline(pts, { color: '#58a6ff', weight: 3, opacity: 0.85 }).addTo(map);
-      L.circleMarker(pts[0], { radius: 6, color: '#3fb950', fillOpacity: 1 })
-        .bindTooltip('start').addTo(map);
-      L.circleMarker(pts[pts.length-1], { radius: 6, color: '#d29922', fillOpacity: 1 })
-        .bindTooltip('end').addTo(map);
-      map.fitBounds(line.getBounds(), { padding: [20, 20] });
-    } else {
-      document.getElementById('map').innerHTML =
-        '<div style="padding:60px 20px;text-align:center;color:var(--text-soft);font-size:13px">Konum verisi yok (GPS sinyali olmadan kaydedilmiş)</div>';
+      const line = L.polyline(pts, { color: '#58a6ff', weight: 3, opacity: 0.75 }).addTo(map);
+      L.circleMarker(pts[0], { radius: 7, color: '#3fb950', fillColor: '#3fb950', fillOpacity: 1, weight: 0 })
+        .bindTooltip(LANG === 'en' ? 'Start' : 'Başlangıç').addTo(map);
+      L.circleMarker(pts[pts.length-1], { radius: 7, color: '#d29922', fillColor: '#d29922', fillOpacity: 1, weight: 0 })
+        .bindTooltip(LANG === 'en' ? 'End' : 'Bitiş').addTo(map);
+      map.fitBounds(line.getBounds(), { padding: [30, 30] });
+
+      // Playback: animated drone marker along the track
+      const droneIcon = L.divIcon({
+        className: 'drone-marker',
+        html: '<div style="width:14px;height:14px;background:#58a6ff;border:3px solid #fff;border-radius:50%;box-shadow:0 0 16px rgba(88,166,255,.8)"></div>',
+        iconSize: [14, 14], iconAnchor: [7, 7],
+      });
+      const drone = L.marker(pts[0], { icon: droneIcon }).addTo(map);
+      const trail = L.polyline([pts[0]], { color: '#58a6ff', weight: 4, opacity: 1 }).addTo(map);
+      const scrub = document.getElementById('scrub');
+      const scrubTime = document.getElementById('scrub-time');
+      const playBtn = document.getElementById('play-btn');
+      const PLAY_HTML = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="none"><polygon points="6 3 20 12 6 21 6 3"/></svg>';
+      const PAUSE_HTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>';
+      let playing = false, idx = 0;
+      const total = pts.length;
+      const totalSec = data.points[total-1] && data.points[0] ?
+        Math.max(1, (parseFloat(data.points[total-1].alt||0) + total)) : total;
+      scrub.max = total - 1;
+      function fmtT(i) {
+        const t = Math.floor((i / Math.max(1, total - 1)) * (totalSec));
+        return `${Math.floor(t/60)}:${String(t%60).padStart(2,'0')}`;
+      }
+      function totalT() {
+        return `${Math.floor(totalSec/60)}:${String(Math.floor(totalSec)%60).padStart(2,'0')}`;
+      }
+      function update(i) {
+        idx = Math.max(0, Math.min(total - 1, i));
+        drone.setLatLng(pts[idx]);
+        trail.setLatLngs(pts.slice(0, idx + 1));
+        scrub.value = idx;
+        scrubTime.textContent = `${fmtT(idx)} / ${totalT()}`;
+      }
+      scrub.addEventListener('input', e => { pause(); update(parseInt(e.target.value)); });
+      function play() {
+        if (idx >= total - 1) idx = 0;
+        playing = true;
+        playBtn.innerHTML = PAUSE_HTML;
+        playBtn.title = LANG === 'en' ? 'Pause' : 'Duraklat';
+        function tick() {
+          if (!playing) return;
+          update(idx + 1);
+          if (idx >= total - 1) { pause(); return; }
+          setTimeout(tick, Math.max(60, (totalSec * 1000) / total / 1.5));
+        }
+        tick();
+      }
+      function pause() {
+        playing = false;
+        playBtn.innerHTML = PLAY_HTML;
+        playBtn.title = LANG === 'en' ? 'Play' : 'Oynat';
+      }
+      playBtn.addEventListener('click', () => playing ? pause() : play());
+      update(0);
+      playBtn.innerHTML = PLAY_HTML;
     }
   } catch(e) { console.error(e); }
 
@@ -904,7 +1033,19 @@ RUN_HTML = (BASE_CSS + """
       LANDING: 'İniş', DISARM: 'Motor kapalı',
       MISSION_COMPLETE: 'Tamamlandı', ABORT: 'İptal',
       FAILED: 'Başarısız', READ_ONLY: 'Salt-okunur',
+      CRUISE: 'Seyir', DELIVERY: 'Teslimat', DROP: 'Bırakma',
     };
+    const labels_en = {
+      IDLE: 'Idle', WAIT_PACKET: 'Waiting', PREFLIGHT: 'Preflight',
+      TAKEOFF: 'Takeoff', NAVIGATE: 'Navigate', SEARCH_MARKER: 'Searching',
+      PRECISION_APPROACH: 'Approach', BIOMETRIC_VERIFY: 'Face verify',
+      DROP_PACKAGE: 'Drop', RETURN_HOME: 'Return home',
+      LANDING: 'Landing', DISARM: 'Disarmed',
+      MISSION_COMPLETE: 'Complete', ABORT: 'Abort',
+      FAILED: 'Failed', READ_ONLY: 'Read-only',
+      CRUISE: 'Cruise', DELIVERY: 'Delivery', DROP: 'Drop',
+    };
+    const labels = LANG === 'en' ? labels_en : labels_tr;
     if (!data.phases.length) {
       document.getElementById('phases').innerHTML =
         '<span style="color:var(--text-soft)">Aşama verisi yok</span>';
@@ -916,7 +1057,7 @@ RUN_HTML = (BASE_CSS + """
     data.phases.forEach(p => {
       const w = ((p.end - p.start) / total * 100).toFixed(2);
       const c = colors[p.state] || '#6b7689';
-      const lbl = labels_tr[p.state] || p.state;
+      const lbl = labels[p.state] || p.state;
       const dur = (p.end-p.start).toFixed(0);
       seen.add(p.state);
       html += `<div title="${lbl} — ${dur} saniye" style="flex:0 0 ${w}%;background:${c};display:grid;place-items:center;font-size:11px;color:#0d1117;font-weight:600;overflow:hidden;white-space:nowrap;padding:0 6px;cursor:default">${w >= 10 ? lbl : ''}</div>`;
@@ -950,37 +1091,29 @@ RUN_HTML = (BASE_CSS + """
     }
   } catch(e) {}
 
-  // Phase stepper (canonical mission flow)
+  // Phase stepper (i18n labels from data-flow)
   try {
-    const FLOW = [
-      ['WAIT_PACKET', 'Bekleme', '""" + "play" + """'],
-      ['TAKEOFF', 'Kalkış', 'plane_up'],
-      ['NAVIGATE', 'Hedefe gidiş', 'plane'],
-      ['SEARCH_MARKER', 'İşaret', 'crosshair'],
-      ['PRECISION_APPROACH', 'Yaklaşım', 'arrow_down'],
-      ['BIOMETRIC_VERIFY', 'Yüz', 'user_check'],
-      ['DROP_PACKAGE', 'Teslim', 'package'],
-      ['RETURN_HOME', 'Dönüş', 'home'],
-    ];
+    const step = document.getElementById('stepper');
+    const FLOW = JSON.parse(step.dataset.flow);  // [[state, label]…]
     const r = await fetch(`/run/${name}/phases.json`);
     const data = await r.json();
     const visited = new Set(data.phases.map(p => p.state));
     const aborted = visited.has('ABORT') || visited.has('FAILED');
     const current = data.phases.length ? data.phases[data.phases.length - 1].state : null;
-    const step = document.getElementById('stepper');
     step.innerHTML = '';
-    FLOW.forEach(([st, lbl, ic]) => {
+    FLOW.forEach(([st, lbl]) => {
       let cls = '';
       if (visited.has(st)) cls = 'done';
       if (st === current && !aborted) cls = 'current';
       if (aborted && current === st) cls = 'err';
-      const html = `<div class="step ${cls}">
-        <div class="step-circle">${cls==='done' ? '✓' : (cls==='err' ? '✕' : '·')}</div>
-        <div class="step-label">${lbl}</div>
-      </div>`;
-      step.insertAdjacentHTML('beforeend', html);
+      const mark = cls === 'done' ? '✓' : (cls === 'err' ? '✕' : '');
+      step.insertAdjacentHTML('beforeend',
+        `<div class="step ${cls}"><div class="step-circle">${mark}</div><div class="step-label">${lbl}</div></div>`);
     });
-  } catch(e) { document.getElementById('stepper').textContent = 'Aşama verisi yüklenemedi'; }
+  } catch(e) {
+    document.getElementById('stepper').textContent =
+      LANG === 'en' ? 'Phase data unavailable' : 'Aşama verisi yüklenemedi';
+  }
 
   // Failsafe events (TR)
   try {
@@ -988,12 +1121,15 @@ RUN_HTML = (BASE_CSS + """
     const data = await r.json();
     const panel = document.getElementById('failsafe-panel');
     if (!data.events.length) {
-      panel.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--ok)"><span style="display:inline-block;width:8px;height:8px;background:var(--ok);border-radius:50%"></span>Bu görevde güvenlik uyarısı tetiklenmedi — her şey yolundaydı.</div>';
+      const clearMsg = panel.dataset.clear;
+      panel.innerHTML = `<div style="display:flex;align-items:center;gap:10px;color:var(--ok)"><span style="display:inline-block;width:8px;height:8px;background:var(--ok);border-radius:50%"></span>${clearMsg}</div>`;
     } else {
       let html = '<div style="display:flex;flex-direction:column;gap:8px">';
       data.events.forEach(e => {
         const t = `${Math.floor(e.t/60)}:${String(Math.floor(e.t%60)).padStart(2,'0')}`;
-        html += `<div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--err);font-weight:600;font-size:12px">⚠ UYARI</span><span style="font-family:'JetBrains Mono',monospace;color:var(--text-soft);font-size:12px">${t}</span><span style="color:var(--text);font-size:13px">Aşama: ${e.state}</span></div>`;
+        const lblWarn = LANG === 'en' ? '⚠ ALERT' : '⚠ UYARI';
+        const lblPhase = LANG === 'en' ? 'phase' : 'Aşama';
+        html += `<div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--err);font-weight:600;font-size:12px">${lblWarn}</span><span style="font-family:'JetBrains Mono',monospace;color:var(--text-soft);font-size:12px">${t}</span><span style="color:var(--text);font-size:13px">${lblPhase}: ${e.state}</span></div>`;
       });
       html += '</div>';
       panel.innerHTML = html;
@@ -1005,68 +1141,105 @@ RUN_HTML = (BASE_CSS + """
 
 
 EVENT_MAP = {
-    "start":             ("play", "accent", "Görev başladı"),
-    "takeoff":           ("plane_up", "accent", "Drone havalandı"),
-    "cruise":            ("plane", "accent", "Hedefe gidiyor"),
-    "marker_locked":     ("crosshair", "violet", "Hedef işaret bulundu"),
-    "marker_lost":       ("alert", "err", "Hedef işaret kaybedildi"),
-    "face_match":        ("user_check", "pink", "Alıcı yüzü tanındı"),
-    "face_mismatch":     ("user_x", "err", "Yüz eşleşmedi"),
-    "package_delivered": ("package", "ok", "Paket teslim edildi"),
-    "rtl_complete":      ("home", "warn", "Eve döndü"),
-    "abort":             ("octagon_x", "err", "Görev iptal edildi"),
-    "land":              ("arrow_down", "warn", "İniş yapıyor"),
-    "phase":             ("dot", "", "Aşama değişti"),
-    "mission_end":       ("home", "warn", "Görev tamamlandı"),
+    # event_name: (icon, tone, label_tr, label_en)
+    "start":             ("play", "accent", "Görev başladı", "Mission started"),
+    "takeoff":           ("plane_up", "accent", "Drone havalandı", "Drone took off"),
+    "cruise":            ("plane", "accent", "Hedefe gidiyor", "Cruising to target"),
+    "marker_locked":     ("crosshair", "violet", "Hedef işaret bulundu", "Marker located"),
+    "marker_lost":       ("alert", "err", "Hedef işaret kaybedildi", "Marker lost"),
+    "face_match":        ("user_check", "pink", "Alıcı yüzü tanındı", "Recipient face matched"),
+    "face_mismatch":     ("user_x", "err", "Yüz eşleşmedi", "Face mismatch"),
+    "package_delivered": ("package", "ok", "Paket teslim edildi", "Package delivered"),
+    "rtl_complete":      ("home", "warn", "Eve döndü", "Returned home"),
+    "abort":             ("octagon_x", "err", "Görev iptal edildi", "Mission aborted"),
+    "land":              ("arrow_down", "warn", "İniş yapıyor", "Landing"),
+    "phase":             ("dot", "", "Aşama değişti", "Phase change"),
+    "mission_end":       ("home", "warn", "Görev tamamlandı", "Mission ended"),
 }
+
+
+# Friendly detail formatter (no raw key=value)
+def _format_detail(event_name: str, extras: dict, lang: str) -> str:
+    tr = lang == "tr"
+    if event_name == "phase":
+        return extras.get("state", "")
+    if event_name == "takeoff":
+        alt = extras.get("alt")
+        if alt is not None:
+            return f"{alt:.0f} m" if tr else f"{alt:.0f} m altitude"
+    if event_name == "face_match":
+        conf = extras.get("confidence")
+        if conf is not None:
+            pct = float(conf) * 100
+            return f"%{pct:.0f} eşleşme" if tr else f"{pct:.0f}% match"
+    if event_name == "marker_locked":
+        mid = extras.get("id")
+        if mid is not None:
+            return f"id {mid}"
+    if event_name == "abort":
+        return extras.get("reason", "")
+    if event_name == "package_delivered":
+        rid = extras.get("recipient_id")
+        if rid is not None:
+            return f"alıcı {rid}" if tr else f"recipient {rid}"
+    # fallback: ignore raw msg/internal kvs
+    if "msg" in extras:
+        return ""
+    return ""
 
 
 def _human_summary(name: str, events: list, duration_s: int,
                    delivered: bool, abort_reason: str,
-                   tel_stats: dict) -> str:
-    """Kısa, çocuk-anlayışlı Türkçe görev özeti üret."""
+                   tel_stats: dict, lang: str = "tr") -> str:
+    """Görev özeti — TR veya EN."""
     parts = []
+    en = lang == "en"
     if duration_s > 0:
         m, s = divmod(duration_s, 60)
-        if m > 0:
-            parts.append(f"Görev {m} dakika {s} saniye sürdü.")
+        if en:
+            parts.append(f"Mission lasted {m}m {s}s." if m else f"Mission lasted {s}s.")
         else:
-            parts.append(f"Görev {s} saniye sürdü.")
+            parts.append(f"Görev {m} dakika {s} saniye sürdü." if m else f"Görev {s} saniye sürdü.")
     max_alt = tel_stats.get("max_alt")
     if max_alt and max_alt > 1:
-        parts.append(f"Drone en fazla {max_alt:.0f} metre yüksekliğe çıktı.")
+        parts.append(f"Drone reached {max_alt:.0f} m altitude." if en
+                     else f"Drone en fazla {max_alt:.0f} metre yüksekliğe çıktı.")
     if any(e.get("event") == "marker_locked" for e in events):
-        parts.append("Yer işaretini buldu.")
+        parts.append("Ground marker located." if en else "Yer işaretini buldu.")
     face = next((e for e in events if e.get("event") == "face_match"), None)
     if face:
         conf = face.get("confidence")
         if conf is not None:
-            parts.append(f"Alıcının yüzünü %{float(conf)*100:.0f} eşleşme ile tanıdı.")
+            pct = float(conf) * 100
+            parts.append(f"Recipient face matched at {pct:.0f}% confidence." if en
+                         else f"Alıcının yüzünü %{pct:.0f} eşleşme ile tanıdı.")
         else:
-            parts.append("Alıcının yüzünü tanıdı.")
+            parts.append("Recipient face recognised." if en else "Alıcının yüzünü tanıdı.")
     if delivered:
-        parts.append("Paketi başarıyla teslim etti.")
+        parts.append("Package successfully delivered." if en
+                     else "Paketi başarıyla teslim etti.")
     elif abort_reason:
-        reasons_tr = {
-            "BATTERY_LOW": "batarya zayıf olduğu için",
-            "LINK_LOST": "iletişim koptuğu için",
-            "GPS_LOST": "GPS sinyali kaybolduğu için",
-            "MARKER_LOST": "hedef işaretini bulamadığı için",
-            "FACE_MISMATCH": "yüz eşleşmediği için",
-            "Yer istasyonu ABORT": "yer istasyonu durdurduğu için",
+        reasons = {
+            "BATTERY_LOW": ("due to low battery", "batarya zayıf olduğu için"),
+            "LINK_LOST": ("because the link was lost", "iletişim koptuğu için"),
+            "GPS_LOST": ("because GPS signal was lost", "GPS sinyali kaybolduğu için"),
+            "MARKER_LOST": ("because the marker was lost", "hedef işaretini bulamadığı için"),
+            "FACE_MISMATCH": ("because face did not match", "yüz eşleşmediği için"),
+            "Yer istasyonu ABORT": ("because ground station aborted", "yer istasyonu durdurduğu için"),
         }
-        why = reasons_tr.get(abort_reason, abort_reason)
-        parts.append(f"Görev {why} iptal edildi.")
+        en_why, tr_why = reasons.get(abort_reason, (abort_reason, abort_reason))
+        parts.append(f"Mission aborted {en_why}." if en
+                     else f"Görev {tr_why} iptal edildi.")
     else:
-        parts.append("Görev tamamlanamadı.")
-    if any(e.get("event") == "rtl_complete" for e in events) or \
-       any(e.get("event") == "mission_end" for e in events):
-        parts.append("Drone üsse geri döndü.")
+        parts.append("Mission did not complete." if en else "Görev tamamlanamadı.")
+    if any(e.get("event") in ("rtl_complete", "mission_end") for e in events):
+        parts.append("Drone returned to base." if en else "Drone üsse geri döndü.")
     bat_drop = tel_stats.get("battery_drop")
     if bat_drop and bat_drop > 0.05:
-        parts.append(f"Bataryanın {bat_drop:.1f} voltu harcandı.")
+        parts.append(f"Battery consumed: {bat_drop:.1f} V." if en
+                     else f"Bataryanın {bat_drop:.1f} voltu harcandı.")
     if not parts:
-        return "Bu görev hakkında özet üretilemedi."
+        return "No summary available." if en else "Bu görev hakkında özet üretilemedi."
     return " ".join(parts)
 
 
@@ -1139,6 +1312,10 @@ def index():
 
 @app.route("/run/<name>")
 def run_view(name):
+    from flask import request as freq
+    lang = freq.args.get("lang", freq.cookies.get("lang", "tr"))
+    if lang not in ("tr", "en"):
+        lang = "tr"
     safe = "".join(c for c in name if c.isalnum() or c in "-_.")
     if safe != name:
         abort(400)
@@ -1161,21 +1338,21 @@ def run_view(name):
             if first_ts is None:
                 first_ts = t
             ev_name = j.get("event", "?")
-            ic_key, tone, label_tr = EVENT_MAP.get(
-                ev_name, ("dot", "", ev_name))
+            mapped = EVENT_MAP.get(ev_name, ("dot", "", ev_name, ev_name))
+            ic_key, tone = mapped[0], mapped[1]
+            label = mapped[3] if lang == "en" else mapped[2]
             extras = {k: v for k, v in j.items()
                       if k not in ("ts", "timestamp", "event")}
-            # phase event: state field önemli
             if ev_name == "phase":
-                detail = extras.get("state", "")
-                label_tr = f"Aşama: {extras.get('state', '')}"
-            else:
-                detail = " · ".join(f"{k}={v}" for k, v in extras.items())
+                state = extras.get("state", "")
+                label = (f"Phase: {state}" if lang == "en"
+                         else f"Aşama: {state}")
+            detail = _format_detail(ev_name, extras, lang)
             events.append({
                 "dt": int(t - first_ts),
                 "icon": ICON.get(ic_key, ICON["dot"]),
                 "tone": tone,
-                "label": label_tr,
+                "label": label,
                 "name": ev_name,
                 "detail": detail,
             })
@@ -1184,12 +1361,57 @@ def run_view(name):
     tel_stats = _telemetry_stats(d)
     human = _human_summary(safe, raw_events, summary["duration_s"],
                            summary["delivered"], summary["abort_reason"],
-                           tel_stats)
+                           tel_stats, lang=lang)
+    # I18n labels
+    tr = lang == "tr"
+    i18n = {
+        "back": "Tüm görevler" if tr else "All missions",
+        "delivered": "Başarılı teslimat" if tr else "Delivered",
+        "abort": "Görev iptal" if tr else "Mission aborted",
+        "incomplete": "Tamamlanamadı" if tr else "Incomplete",
+        "headline_ok": "Paket başarıyla teslim edildi." if tr else "Package delivered successfully.",
+        "headline_err": "Görev güvenlik nedeniyle iptal edildi." if tr else "Mission aborted for safety.",
+        "headline_warn": "Görev tamamlanamadı." if tr else "Mission did not complete.",
+        "download": "Verileri indir" if tr else "Download data",
+        "report": "Rapor" if tr else "Report",
+        "compare": "Karşılaştır…" if tr else "Compare…",
+        "duration": "Süre" if tr else "Duration",
+        "duration_sub": "dakika:saniye" if tr else "min:sec",
+        "max_alt": "En yüksek irtifa" if tr else "Max altitude",
+        "max_alt_sub": "yerden uzaklık" if tr else "above ground",
+        "events_lbl": "Olay" if tr else "Events",
+        "events_sub": "kaydedilen aşama" if tr else "logged stages",
+        "battery": "Batarya harcaması" if tr else "Battery used",
+        "battery_sub": "başlangıçtan sona" if tr else "start to end",
+        "phases_title": "Görev aşamaları" if tr else "Mission phases",
+        "phases_hint": "Görev her aşamada ne kadar zaman geçirdi:" if tr else "Time spent in each phase:",
+        "events_title": "Olaylar" if tr else "Events",
+        "plot_title": "İrtifa ve batarya" if tr else "Altitude & battery",
+        "safety_title": "Güvenlik uyarıları" if tr else "Safety alerts",
+        "safety_clear": "Bu görevde güvenlik uyarısı tetiklenmedi — her şey yolundaydı." if tr else "No safety alerts in this mission — all clear.",
+        "route_title": "Uçuş rotası" if tr else "Flight path",
+        "legend_start": "Başlangıç" if tr else "Start",
+        "legend_end": "Bitiş" if tr else "End",
+        "legend_path": "Uçuş yolu" if tr else "Flight path",
+        "playback": "Oynat" if tr else "Play",
+        "playback_pause": "Duraklat" if tr else "Pause",
+        "stepper": ([
+            ('WAIT_PACKET', 'Bekleme' if tr else 'Standby'),
+            ('TAKEOFF', 'Kalkış' if tr else 'Takeoff'),
+            ('NAVIGATE', 'Hedefe gidiş' if tr else 'Navigate'),
+            ('SEARCH_MARKER', 'İşaret' if tr else 'Search'),
+            ('PRECISION_APPROACH', 'Yaklaşım' if tr else 'Approach'),
+            ('BIOMETRIC_VERIFY', 'Yüz' if tr else 'Face'),
+            ('DROP_PACKAGE', 'Teslim' if tr else 'Deliver'),
+            ('RETURN_HOME', 'Dönüş' if tr else 'Return'),
+        ]),
+    }
     return render_template_string(
         RUN_HTML, name=safe, events=events, tel_rows=tel_rows,
         duration_s=summary["duration_s"], delivered=summary["delivered"],
         abort_reason=summary["abort_reason"],
         human_summary=human, tel_stats=tel_stats,
+        lang=lang, i18n=i18n,
     )
 
 
@@ -1200,6 +1422,8 @@ def plot_png(name):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from flask import request as freq
+    lang = freq.args.get("lang", "tr")
     safe = "".join(c for c in name if c.isalnum() or c in "-_.")
     if safe != name:
         abort(400)
@@ -1216,21 +1440,28 @@ def plot_png(name):
                 bat.append(float(row["battery_v"]))
             except Exception:
                 continue
+    if ts:
+        t0 = ts[0]
+        ts = [t - t0 for t in ts]
     plt.style.use("dark_background")
     fig, ax1 = plt.subplots(figsize=(11, 4.2), facecolor="#0d1117")
     ax1.set_facecolor("#0d1117")
-    ax1.plot(ts, alt, color="#58a6ff", linewidth=2.0, label="altitude")
-    ax1.fill_between(ts, alt, alpha=0.10, color="#58a6ff")
-    ax1.set_xlabel("time (s)", color="#9aa5b8", fontsize=10)
-    ax1.set_ylabel("altitude (m)", color="#58a6ff", fontsize=10)
-    ax1.tick_params(colors="#9aa5b8", labelsize=9)
-    ax1.grid(True, alpha=0.08, linestyle="-", linewidth=0.5)
+    ax1.plot(ts, alt, color="#58a6ff", linewidth=2.2)
+    ax1.fill_between(ts, alt, alpha=0.12, color="#58a6ff")
+    en = lang == "en"
+    ax1.set_xlabel("Zaman (saniye)" if not en else "Time (s)",
+                   color="#9aa5b8", fontsize=11)
+    ax1.set_ylabel("İrtifa (metre)" if not en else "Altitude (m)",
+                   color="#58a6ff", fontsize=11, fontweight="bold")
+    ax1.tick_params(colors="#9aa5b8", labelsize=10)
+    ax1.grid(True, alpha=0.10, linestyle="-", linewidth=0.5)
     for sp in ax1.spines.values():
         sp.set_color("#1f2733")
     ax2 = ax1.twinx()
-    ax2.plot(ts, bat, color="#d29922", linewidth=2.0, label="battery")
-    ax2.set_ylabel("battery (V)", color="#d29922", fontsize=10)
-    ax2.tick_params(colors="#9aa5b8", labelsize=9)
+    ax2.plot(ts, bat, color="#d29922", linewidth=2.2)
+    ax2.set_ylabel("Batarya (volt)" if not en else "Battery (V)",
+                   color="#d29922", fontsize=11, fontweight="bold")
+    ax2.tick_params(colors="#9aa5b8", labelsize=10)
     for sp in ax2.spines.values():
         sp.set_color("#1f2733")
     fig.tight_layout()
@@ -1373,6 +1604,104 @@ def run_report_md(name):
     from make_report import build_report_md
     from flask import Response
     return Response(build_report_md(d), mimetype="text/markdown")
+
+
+def _md_to_html(md: str) -> str:
+    """Hafif MD -> HTML çevirici (markdown paketi gerektirmez)."""
+    import html as html_mod
+    out = []
+    in_table = False
+    for line in md.splitlines():
+        s = line
+        if s.startswith("# "):
+            out.append(f"<h1>{html_mod.escape(s[2:])}</h1>")
+        elif s.startswith("## "):
+            out.append(f"<h2>{html_mod.escape(s[3:])}</h2>")
+        elif s.startswith("- "):
+            content = s[2:]
+            content = content.replace("**", "<b>", 1).replace("**", "</b>", 1)
+            content = content.replace("`", "<code>", 1).replace("`", "</code>", 1)
+            out.append(f"<li>{content}</li>")
+        elif "|" in s and s.strip().startswith("|"):
+            cells = [c.strip() for c in s.strip().strip("|").split("|")]
+            if all(set(c) <= set("-: ") for c in cells):
+                continue  # separator
+            tag = "th" if not in_table else "td"
+            row = "".join(f"<{tag}>{html_mod.escape(c)}</{tag}>" for c in cells)
+            if not in_table:
+                out.append('<table><thead><tr>' + row + '</tr></thead><tbody>')
+                in_table = True
+            else:
+                out.append(f"<tr>{row}</tr>")
+        elif not s.strip() and in_table:
+            out.append("</tbody></table>")
+            in_table = False
+        elif s.strip():
+            out.append(f"<p>{html_mod.escape(s)}</p>")
+    if in_table:
+        out.append("</tbody></table>")
+    return "\n".join(out)
+
+
+REPORT_HTML_CSS = """
+<style>
+:root { color-scheme: dark; }
+body {
+  background: #0d1117; color: #e6edf3;
+  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  max-width: 780px; margin: 40px auto; padding: 0 24px 60px;
+}
+h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.02em; }
+h2 { font-size: 18px; margin: 32px 0 12px; padding-bottom: 8px;
+     border-bottom: 1px solid #1f2733; color: #58a6ff;
+     text-transform: uppercase; letter-spacing: .08em; }
+li { margin: 4px 0; }
+b { color: #58a6ff; font-weight: 600; }
+code { background: #1a212d; padding: 2px 6px; border-radius: 4px;
+       font: 13px ui-monospace, monospace; }
+table {
+  width: 100%; border-collapse: collapse;
+  background: #131922; border: 1px solid #1f2733;
+  border-radius: 8px; overflow: hidden; margin: 14px 0;
+}
+th, td { padding: 10px 14px; text-align: left; }
+th { background: #1a212d; font-size: 12px; text-transform: uppercase;
+     letter-spacing: .08em; color: #9aa5b8; }
+td { border-top: 1px solid #1f2733; font-size: 13px; }
+.print-btn {
+  position: fixed; top: 20px; right: 24px;
+  background: #58a6ff; color: #0d1117; border: 0;
+  padding: 8px 14px; border-radius: 8px;
+  font: 600 13px inherit; cursor: pointer;
+  text-decoration: none;
+}
+@media print {
+  body { background: white; color: black; }
+  h2 { color: black; border-color: #ccc; }
+  b { color: black; }
+  table, th, td { border-color: #ccc !important; background: white !important; }
+  .print-btn { display: none; }
+}
+</style>
+"""
+
+
+@app.route("/run/<name>/report.html")
+def run_report_html(name):
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    d = RUNS_DIR / safe
+    if not d.exists():
+        abort(404)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    from make_report import build_report_md
+    md = build_report_md(d)
+    body = _md_to_html(md)
+    return (f"<!doctype html><html><head><meta charset=utf-8>"
+            f"<title>Report {safe}</title>{REPORT_HTML_CSS}</head><body>"
+            f'<a href="javascript:window.print()" class="print-btn">'
+            f'PDF olarak yazdır</a>{body}</body></html>')
 
 
 @app.route("/run/<name>/track.tlog")
