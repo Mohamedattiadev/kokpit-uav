@@ -18,205 +18,403 @@ RUNS_DIR = ROOT / "runs"
 app = Flask(__name__)
 
 
+# Lucide-style inline SVG icons (MIT). 20x20 stroke 1.75
+def _svg(d_paths: str, size: int = 18) -> str:
+    return (f'<svg width="{size}" height="{size}" viewBox="0 0 24 24" fill="none" '
+            f'stroke="currentColor" stroke-width="1.75" stroke-linecap="round" '
+            f'stroke-linejoin="round">{d_paths}</svg>')
+
+
+ICON = {
+    "play": _svg('<polygon points="6 3 20 12 6 21 6 3"/>'),
+    "plane_up": _svg('<path d="M14.639 10.258 21 6"/><path d="m2 16 20-5"/>'
+                     '<path d="M9 17.5 8 22l-2-2-2-2 4.5-1"/>'),
+    "plane": _svg('<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z"/>'),
+    "crosshair": _svg('<circle cx="12" cy="12" r="10"/><line x1="22" y1="12" x2="18" y2="12"/>'
+                      '<line x1="6" y1="12" x2="2" y2="12"/><line x1="12" y1="6" x2="12" y2="2"/>'
+                      '<line x1="12" y1="22" x2="12" y2="18"/>'),
+    "alert": _svg('<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>'
+                  '<line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
+    "user_check": _svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+                       '<circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>'),
+    "user_x": _svg('<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>'
+                   '<circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/>'
+                   '<line x1="22" y1="8" x2="17" y2="13"/>'),
+    "package": _svg('<path d="m7.5 4.27 9 5.15"/>'
+                    '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/>'
+                    '<path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>'),
+    "home": _svg('<path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+                 '<polyline points="9 22 9 12 15 12 15 22"/>'),
+    "octagon_x": _svg('<polygon points="7.86 2 16.14 2 22 7.86 22 16.14 16.14 22 7.86 22 2 16.14 2 7.86 7.86 2"/>'
+                      '<line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>'),
+    "arrow_down": _svg('<path d="M12 5v14"/><path d="m19 12-7 7-7-7"/>'),
+    "dot": _svg('<circle cx="12" cy="12" r="3" fill="currentColor"/>'),
+    "arrow_left": _svg('<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>', size=14),
+    "activity": _svg('<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'),
+    "satellite": _svg('<path d="M13 7 9 3 5 7l4 4"/><path d="m17 11 4 4-4 4-4-4"/>'
+                      '<path d="m8 12 4 4"/><path d="m16 8-4 4"/>'
+                      '<path d="m6 16 1.5 1.5"/><path d="M18 21a3 3 0 0 1-3-3"/>'),
+    "clock": _svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
+}
+
+
 BASE_CSS = """
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #0b0f17;
-  --panel: #131a26;
-  --panel-2: #1a2333;
-  --border: #243049;
-  --text: #e5edff;
-  --muted: #8090b3;
-  --accent: #38bdf8;
-  --ok: #4ade80;
-  --warn: #fbbf24;
-  --err: #f87171;
+  --bg-0: #07090e;
+  --bg-1: #0d1117;
+  --bg-2: #131922;
+  --bg-3: #1a212d;
+  --border: #1f2733;
+  --border-strong: #2c3645;
+  --text: #e6edf3;
+  --text-dim: #9aa5b8;
+  --text-soft: #6b7689;
+  --accent: #58a6ff;
+  --accent-soft: rgba(88,166,255,.10);
+  --ok: #3fb950;
+  --ok-soft: rgba(63,185,80,.12);
+  --warn: #d29922;
+  --warn-soft: rgba(210,153,34,.12);
+  --err: #f85149;
+  --err-soft: rgba(248,81,73,.12);
+  --violet: #a371f7;
+  --pink: #db61a2;
 }
 * { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg-0); color: var(--text); }
 body {
-  margin: 0; padding: 0;
-  background: linear-gradient(180deg, #0b0f17 0%, #050810 100%);
-  color: var(--text);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  background:
+    radial-gradient(800px 400px at 20% -10%, rgba(88,166,255,.05), transparent 60%),
+    radial-gradient(600px 300px at 90% 0%, rgba(163,113,247,.04), transparent 60%),
+    var(--bg-0);
 }
-.header {
-  background: rgba(19,26,38,.8);
-  backdrop-filter: blur(12px);
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+
+.nav {
   border-bottom: 1px solid var(--border);
-  padding: 18px 32px;
-  position: sticky; top: 0; z-index: 10;
+  background: rgba(13,17,23,.72);
+  backdrop-filter: blur(10px);
+  position: sticky; top: 0; z-index: 50;
+}
+.nav-inner {
+  max-width: 1180px; margin: 0 auto;
+  padding: 14px 28px;
   display: flex; align-items: center; justify-content: space-between;
 }
-.brand { font-size: 20px; font-weight: 700; letter-spacing: .3px; }
-.brand .dot { color: var(--accent); margin-right: 8px; }
-.subtitle { color: var(--muted); font-size: 13px; }
-.container { max-width: 1100px; margin: 0 auto; padding: 32px; }
-.runs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.brand {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 600; font-size: 15px; letter-spacing: -0.01em;
+}
+.brand-mark {
+  width: 28px; height: 28px;
+  background: linear-gradient(135deg, #58a6ff 0%, #a371f7 100%);
+  border-radius: 7px;
+  display: grid; place-items: center;
+  color: white;
+}
+.brand-mark svg { stroke-width: 2.2; }
+.brand-sub { color: var(--text-soft); font-size: 12px; font-weight: 400; margin-left: 10px; }
+.nav-meta { color: var(--text-soft); font-size: 12px; display: flex; gap: 18px; align-items: center; }
+
+.wrap { max-width: 1180px; margin: 0 auto; padding: 32px 28px 80px; }
+.page-title { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 4px; }
+.page-sub { color: var(--text-dim); font-size: 13px; margin: 0 0 28px; }
+
+.grid {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
 .card {
-  background: var(--panel);
+  display: block; text-decoration: none; color: inherit;
+  background: var(--bg-1);
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 10px;
   padding: 18px 20px;
-  transition: all .15s ease;
-  text-decoration: none; color: inherit; display: block;
+  transition: border-color .15s ease, transform .15s ease, background .15s ease;
+  position: relative;
+  overflow: hidden;
 }
+.card::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px;
+  background: var(--border-strong);
+  transition: background .15s ease;
+}
+.card.ok::before { background: var(--ok); }
+.card.err::before { background: var(--err); }
+.card.warn::before { background: var(--warn); }
 .card:hover {
-  border-color: var(--accent);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(56,189,248,.08);
+  border-color: var(--border-strong);
+  background: var(--bg-2);
 }
-.card h3 { margin: 0 0 8px; font-size: 16px; font-weight: 600; }
-.badges { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.badge {
-  font-size: 11px; padding: 3px 9px; border-radius: 999px;
-  background: var(--panel-2); border: 1px solid var(--border);
-  color: var(--muted); font-weight: 500;
+.card h3 {
+  margin: 0 0 6px;
+  font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  font-family: 'JetBrains Mono', monospace;
 }
-.badge.ok { background: rgba(74,222,128,.12); color: var(--ok); border-color: rgba(74,222,128,.3); }
-.badge.warn { background: rgba(251,191,36,.12); color: var(--warn); border-color: rgba(251,191,36,.3); }
-.badge.err { background: rgba(248,113,113,.12); color: var(--err); border-color: rgba(248,113,113,.3); }
-.empty {
-  text-align: center; padding: 60px 20px;
-  color: var(--muted);
-}
-.empty .icon { font-size: 48px; margin-bottom: 16px; opacity: .4; }
-.section { margin-top: 28px; }
-.section h2 {
-  font-size: 14px; text-transform: uppercase; letter-spacing: 2px;
-  color: var(--muted); margin: 0 0 14px; font-weight: 600;
-}
-.panel {
-  background: var(--panel);
+.card-meta { color: var(--text-soft); font-size: 12px; }
+.card-row { display: flex; justify-content: space-between; align-items: center; margin-top: 14px; }
+.card-stats { display: flex; gap: 14px; font-size: 12px; color: var(--text-dim); }
+.card-stats span { display: inline-flex; align-items: center; gap: 5px; }
+.card-stats svg { color: var(--text-soft); }
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 11px; font-weight: 500;
+  padding: 3px 8px; border-radius: 5px;
+  background: var(--bg-3); color: var(--text-dim);
   border: 1px solid var(--border);
+}
+.chip.ok { background: var(--ok-soft); color: var(--ok); border-color: rgba(63,185,80,.25); }
+.chip.warn { background: var(--warn-soft); color: var(--warn); border-color: rgba(210,153,34,.25); }
+.chip.err { background: var(--err-soft); color: var(--err); border-color: rgba(248,81,73,.25); }
+.chip svg { width: 12px; height: 12px; }
+
+.empty {
+  text-align: center; padding: 80px 20px;
+  color: var(--text-soft);
+  border: 1px dashed var(--border);
   border-radius: 12px;
-  padding: 20px 24px;
+  background: var(--bg-1);
 }
-.timeline { display: flex; flex-direction: column; gap: 4px; }
+.empty svg { color: var(--text-soft); width: 32px; height: 32px; margin-bottom: 12px; }
+.empty p { margin: 0; font-size: 13px; }
+.empty code {
+  font-family: 'JetBrains Mono', monospace;
+  background: var(--bg-3); padding: 2px 6px; border-radius: 4px;
+  font-size: 12px;
+}
+
+/* Run detail */
+.back {
+  display: inline-flex; align-items: center; gap: 6px;
+  color: var(--text-dim); font-size: 13px; text-decoration: none;
+  margin-bottom: 14px;
+}
+.back:hover { color: var(--text); }
+.run-header {
+  display: flex; justify-content: space-between; align-items: flex-end;
+  margin-bottom: 28px; padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+.run-title { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin: 0; font-family: 'JetBrains Mono', monospace; }
+.run-sub { color: var(--text-soft); font-size: 12px; margin-top: 4px; }
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 28px;
+}
+.stat { background: var(--bg-1); padding: 18px 20px; }
+.stat-label {
+  color: var(--text-soft); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .08em; font-weight: 500;
+  display: inline-flex; align-items: center; gap: 6px;
+  margin-bottom: 8px;
+}
+.stat-label svg { width: 13px; height: 13px; }
+.stat-value { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+.stat-value.mono { font-family: 'JetBrains Mono', monospace; font-weight: 500; }
+
+.section-label {
+  color: var(--text-soft); font-size: 11px;
+  text-transform: uppercase; letter-spacing: .1em; font-weight: 600;
+  margin: 28px 0 12px;
+}
+
+.timeline {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-1);
+}
 .event {
-  display: grid; grid-template-columns: 70px 40px 1fr;
-  gap: 12px; align-items: center;
-  padding: 10px 14px; border-radius: 8px;
-  background: var(--panel-2);
-  border-left: 3px solid var(--border);
-  font-size: 14px;
+  display: grid; grid-template-columns: 70px 36px 1fr auto;
+  align-items: center; gap: 14px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
 }
-.event.ev-start    { border-left-color: var(--accent); }
-.event.ev-takeoff  { border-left-color: var(--accent); }
-.event.ev-marker   { border-left-color: #a78bfa; }
-.event.ev-face     { border-left-color: #f472b6; }
-.event.ev-deliver  { border-left-color: var(--ok); }
-.event.ev-abort    { border-left-color: var(--err); }
-.event.ev-rtl      { border-left-color: var(--warn); }
-.event .ts { color: var(--muted); font-family: ui-monospace, monospace; font-size: 13px; }
-.event .icon { font-size: 18px; text-align: center; }
-.event .payload { color: var(--muted); font-family: ui-monospace, monospace; font-size: 12px; }
-.event .payload b { color: var(--text); font-weight: 600; }
-.kv { display: flex; gap: 24px; flex-wrap: wrap; margin: 16px 0; }
-.kv .item { display: flex; flex-direction: column; gap: 4px; }
-.kv .lbl { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; }
-.kv .val { font-size: 22px; font-weight: 600; }
-.plot-wrap { margin-top: 20px; }
-.plot-wrap img { width: 100%; border-radius: 8px; border: 1px solid var(--border); }
-a { color: var(--accent); text-decoration: none; }
-a:hover { text-decoration: underline; }
-.back { color: var(--muted); font-size: 13px; }
+.event:last-child { border-bottom: none; }
+.event:hover { background: var(--bg-2); }
+.event .t {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px; color: var(--text-soft);
+}
+.event .ic {
+  width: 30px; height: 30px;
+  display: grid; place-items: center;
+  border-radius: 7px;
+  background: var(--bg-3);
+  color: var(--text-dim);
+}
+.event .ic.ok { background: var(--ok-soft); color: var(--ok); }
+.event .ic.err { background: var(--err-soft); color: var(--err); }
+.event .ic.warn { background: var(--warn-soft); color: var(--warn); }
+.event .ic.violet { background: rgba(163,113,247,.12); color: var(--violet); }
+.event .ic.pink { background: rgba(219,97,162,.12); color: var(--pink); }
+.event .ic.accent { background: var(--accent-soft); color: var(--accent); }
+.event .name {
+  font-size: 13px; font-weight: 500;
+  font-family: 'JetBrains Mono', monospace;
+}
+.event .detail {
+  color: var(--text-soft); font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+}
+
+.plot-card {
+  margin-top: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--bg-1);
+}
+.plot-card img { width: 100%; display: block; }
+
+a.link { color: var(--accent); text-decoration: none; }
+a.link:hover { text-decoration: underline; }
 </style>
 """
 
+LOGO_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6z"/></svg>'
+
 INDEX_HTML = (BASE_CSS + """
-<div class="header">
-  <div>
-    <div class="brand"><span class="dot">●</span>Kokpit Mission Replay</div>
-    <div class="subtitle">Otonom teslimat görev kayıtları · {{ runs|length }} kayıt</div>
+<nav class="nav"><div class="nav-inner">
+  <div class="brand">
+    <div class="brand-mark">""" + LOGO_SVG + """</div>
+    <span>Kokpit</span>
+    <span class="brand-sub">Mission Replay</span>
   </div>
-  <div class="subtitle">Teknofest 2026</div>
-</div>
-<div class="container">
+  <div class="nav-meta">
+    <span>{{ runs|length }} run{{ '' if runs|length==1 else 's' }}</span>
+    <span>·</span>
+    <span>Teknofest 2026</span>
+  </div>
+</div></nav>
+
+<div class="wrap">
+  <h1 class="page-title">Mission archive</h1>
+  <p class="page-sub">Otonom teslimat görev kayıtları — events, telemetry ve plot.</p>
+
 {% if runs %}
-<div class="runs-grid">
+<div class="grid">
   {% for r in runs %}
-  <a class="card" href="/run/{{ r.name }}">
+  <a class="card {{ 'ok' if r.delivered else ('err' if r.abort_reason else 'warn') }}"
+     href="/run/{{ r.name }}">
     <h3>{{ r.name }}</h3>
-    <div class="subtitle">{{ r.duration_s }}s · {{ r.telemetry_rows }} telemetry</div>
-    <div class="badges">
-      {% if r.delivered %}<span class="badge ok">✓ delivered</span>{% endif %}
-      {% if r.abort_reason %}<span class="badge err">⚠ {{ r.abort_reason }}</span>{% endif %}
-      {% if not r.delivered and not r.abort_reason %}<span class="badge warn">incomplete</span>{% endif %}
+    <div class="card-meta">{{ r.duration_s }}s mission</div>
+    <div class="card-row">
+      <div class="card-stats">
+        <span>""" + ICON["clock"] + """ {{ r.duration_s }}s</span>
+        <span>""" + ICON["activity"] + """ {{ r.telemetry_rows }}</span>
+      </div>
+      {% if r.delivered %}
+        <span class="chip ok">""" + ICON["package"] + """ delivered</span>
+      {% elif r.abort_reason %}
+        <span class="chip err">""" + ICON["octagon_x"] + """ {{ r.abort_reason }}</span>
+      {% else %}
+        <span class="chip warn">incomplete</span>
+      {% endif %}
     </div>
   </a>
   {% endfor %}
 </div>
 {% else %}
 <div class="empty">
-  <div class="icon">📡</div>
-  <div>Henüz kayıt yok. Görev çalıştırınca <code>runs/&lt;ts&gt;/</code> burada görünür.</div>
+  """ + ICON["satellite"] + """
+  <p>Henüz görev kaydı yok.</p>
+  <p style="margin-top:6px;font-size:12px">Yeni run <code>runs/&lt;ts&gt;/</code> dizininde otomatik görünür.</p>
 </div>
 {% endif %}
 </div>
 """)
 
 RUN_HTML = (BASE_CSS + """
-<div class="header">
-  <div>
-    <div class="brand"><span class="dot">●</span>{{ name }}</div>
-    <div class="subtitle"><a href="/" class="back">← Tüm kayıtlar</a></div>
+<nav class="nav"><div class="nav-inner">
+  <div class="brand">
+    <div class="brand-mark">""" + LOGO_SVG + """</div>
+    <span>Kokpit</span>
+    <span class="brand-sub">Mission Replay</span>
   </div>
-  <div class="subtitle">{{ events|length }} olay · {{ tel_rows }} telemetry row</div>
-</div>
-<div class="container">
+  <div class="nav-meta"><span>Teknofest 2026</span></div>
+</div></nav>
 
-<div class="kv">
-  <div class="item"><div class="lbl">Süre</div><div class="val">{{ duration_s }}s</div></div>
-  <div class="item"><div class="lbl">Telemetry</div><div class="val">{{ tel_rows }}</div></div>
-  <div class="item"><div class="lbl">Durum</div><div class="val">
-    {% if delivered %}<span style="color:var(--ok)">✓ Teslim</span>
-    {% elif abort_reason %}<span style="color:var(--err)">⚠ Abort</span>
-    {% else %}<span style="color:var(--warn)">—</span>{% endif %}
-  </div></div>
-  {% if abort_reason %}
-  <div class="item"><div class="lbl">Abort sebebi</div><div class="val" style="font-size:16px">{{ abort_reason }}</div></div>
-  {% endif %}
-</div>
-
-<div class="section">
-  <h2>Timeline</h2>
-  <div class="panel">
-    <div class="timeline">
-      {% for e in events %}
-      <div class="event {{ e.css }}">
-        <div class="ts">t+{{ e.dt }}s</div>
-        <div class="icon">{{ e.icon }}</div>
-        <div class="payload"><b>{{ e.name }}</b> {{ e.detail }}</div>
-      </div>
-      {% endfor %}
+<div class="wrap">
+  <a class="back" href="/">""" + ICON["arrow_left"] + """ All runs</a>
+  <div class="run-header">
+    <div>
+      <h1 class="run-title">{{ name }}</h1>
+      <div class="run-sub">{{ events|length }} events · {{ tel_rows }} telemetry rows</div>
+    </div>
+    <div>
+      {% if delivered %}<span class="chip ok">""" + ICON["package"] + """ delivered</span>
+      {% elif abort_reason %}<span class="chip err">""" + ICON["octagon_x"] + """ {{ abort_reason }}</span>
+      {% else %}<span class="chip warn">incomplete</span>{% endif %}
     </div>
   </div>
-</div>
 
-{% if tel_rows > 0 %}
-<div class="section">
-  <h2>Altitude + Battery</h2>
-  <div class="plot-wrap"><img src="/run/{{ name }}/plot.png" alt="plot"/></div>
-</div>
-{% endif %}
+  <div class="stats">
+    <div class="stat">
+      <div class="stat-label">""" + ICON["clock"] + """ Duration</div>
+      <div class="stat-value mono">{{ duration_s }}s</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">""" + ICON["activity"] + """ Telemetry</div>
+      <div class="stat-value mono">{{ tel_rows }}</div>
+    </div>
+    <div class="stat">
+      <div class="stat-label">""" + ICON["satellite"] + """ Events</div>
+      <div class="stat-value mono">{{ events|length }}</div>
+    </div>
+  </div>
 
+  <div class="section-label">Timeline</div>
+  <div class="timeline">
+    {% for e in events %}
+    <div class="event">
+      <div class="t">t+{{ '%02d'|format(e.dt // 60) }}:{{ '%02d'|format(e.dt % 60) }}</div>
+      <div class="ic {{ e.tone }}">{{ e.icon|safe }}</div>
+      <div>
+        <div class="name">{{ e.name }}</div>
+        {% if e.detail %}<div class="detail">{{ e.detail }}</div>{% endif %}
+      </div>
+      <div class="t">+{{ e.dt }}s</div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if tel_rows > 0 %}
+  <div class="section-label">Telemetry · altitude + battery</div>
+  <div class="plot-card"><img src="/run/{{ name }}/plot.png" alt="plot"/></div>
+  {% endif %}
 </div>
 """)
 
 
-EVENT_ICONS = {
-    "start": ("🚀", "ev-start"),
-    "takeoff": ("⬆️", "ev-takeoff"),
-    "cruise": ("✈️", "ev-takeoff"),
-    "marker_locked": ("🎯", "ev-marker"),
-    "marker_lost": ("⚠️", "ev-abort"),
-    "face_match": ("👤", "ev-face"),
-    "face_mismatch": ("✗", "ev-abort"),
-    "package_delivered": ("📦", "ev-deliver"),
-    "rtl_complete": ("🏠", "ev-rtl"),
-    "abort": ("⛔", "ev-abort"),
-    "land": ("⬇️", "ev-rtl"),
+EVENT_MAP = {
+    "start":             ("play", "accent"),
+    "takeoff":           ("plane_up", "accent"),
+    "cruise":            ("plane", "accent"),
+    "marker_locked":     ("crosshair", "violet"),
+    "marker_lost":       ("alert", "err"),
+    "face_match":        ("user_check", "pink"),
+    "face_mismatch":     ("user_x", "err"),
+    "package_delivered": ("package", "ok"),
+    "rtl_complete":      ("home", "warn"),
+    "abort":             ("octagon_x", "err"),
+    "land":              ("arrow_down", "warn"),
 }
 
 
@@ -282,12 +480,18 @@ def run_view(name):
             t = j.get("ts") or j.get("timestamp") or 0
             if first_ts is None:
                 first_ts = t
-            name_ev = j.get("event", "?")
-            icon, css = EVENT_ICONS.get(name_ev, ("•", ""))
-            extras = {k: v for k, v in j.items() if k not in ("ts", "timestamp", "event")}
+            ev_name = j.get("event", "?")
+            ic_key, tone = EVENT_MAP.get(ev_name, ("dot", ""))
+            extras = {k: v for k, v in j.items()
+                      if k not in ("ts", "timestamp", "event")}
             detail = " · ".join(f"{k}={v}" for k, v in extras.items())
-            events.append({"dt": int(t - first_ts), "icon": icon, "css": css,
-                           "name": name_ev, "detail": detail})
+            events.append({
+                "dt": int(t - first_ts),
+                "icon": ICON.get(ic_key, ICON["dot"]),
+                "tone": tone,
+                "name": ev_name,
+                "detail": detail,
+            })
     tel = d / "telemetry.csv"
     tel_rows = max(0, len(tel.read_text().splitlines()) - 1) if tel.exists() else 0
     return render_template_string(
@@ -320,29 +524,26 @@ def plot_png(name):
                 bat.append(float(row["battery_v"]))
             except Exception:
                 continue
-    # Dark theme matplotlib
     plt.style.use("dark_background")
-    fig, ax1 = plt.subplots(figsize=(10, 4.2), facecolor="#0b0f17")
-    ax1.set_facecolor("#131a26")
-    ax1.plot(ts, alt, color="#38bdf8", linewidth=2.2, label="Altitude (m)")
-    ax1.fill_between(ts, alt, alpha=0.15, color="#38bdf8")
-    ax1.set_xlabel("time (s)", color="#8090b3", fontsize=10)
-    ax1.set_ylabel("Altitude (m)", color="#38bdf8", fontsize=10, fontweight="bold")
-    ax1.tick_params(colors="#8090b3")
-    ax1.grid(True, alpha=0.15, linestyle="--")
+    fig, ax1 = plt.subplots(figsize=(11, 4.2), facecolor="#0d1117")
+    ax1.set_facecolor("#0d1117")
+    ax1.plot(ts, alt, color="#58a6ff", linewidth=2.0, label="altitude")
+    ax1.fill_between(ts, alt, alpha=0.10, color="#58a6ff")
+    ax1.set_xlabel("time (s)", color="#9aa5b8", fontsize=10)
+    ax1.set_ylabel("altitude (m)", color="#58a6ff", fontsize=10)
+    ax1.tick_params(colors="#9aa5b8", labelsize=9)
+    ax1.grid(True, alpha=0.08, linestyle="-", linewidth=0.5)
     for sp in ax1.spines.values():
-        sp.set_color("#243049")
+        sp.set_color("#1f2733")
     ax2 = ax1.twinx()
-    ax2.plot(ts, bat, color="#fbbf24", linewidth=2.2, label="Battery (V)")
-    ax2.set_ylabel("Battery (V)", color="#fbbf24", fontsize=10, fontweight="bold")
-    ax2.tick_params(colors="#8090b3")
+    ax2.plot(ts, bat, color="#d29922", linewidth=2.0, label="battery")
+    ax2.set_ylabel("battery (V)", color="#d29922", fontsize=10)
+    ax2.tick_params(colors="#9aa5b8", labelsize=9)
     for sp in ax2.spines.values():
-        sp.set_color("#243049")
-    fig.suptitle(f"Mission Telemetry — {safe}",
-                 color="#e5edff", fontsize=13, fontweight="bold", y=0.98)
+        sp.set_color("#1f2733")
     fig.tight_layout()
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=110, facecolor="#0b0f17",
+    fig.savefig(buf, format="png", dpi=120, facecolor="#0d1117",
                 bbox_inches="tight")
     plt.close(fig)
     buf.seek(0)
@@ -356,7 +557,8 @@ def api_runs():
 
 
 def main():
-    app.run(host="127.0.0.1", port=int(os.environ.get("KOKPIT_REPLAY_PORT", 5000)))
+    app.run(host="127.0.0.1",
+            port=int(os.environ.get("KOKPIT_REPLAY_PORT", 5000)))
 
 
 if __name__ == "__main__":
