@@ -1,7 +1,7 @@
 # Kokpit UAV
 
 [![CI](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-270%20passed-brightgreen)
+![tests](https://img.shields.io/badge/tests-303%20passed-brightgreen)
 ![status](https://img.shields.io/badge/yaz%C4%B1l%C4%B1m-tamam-brightgreen)
 ![donanim](https://img.shields.io/badge/donan%C4%B1m-bekleniyor-yellow)
 
@@ -101,8 +101,8 @@ kokpit-uav/
 
 **Yazılım tarafı tamamlandı.**
 
-- 270 unit test geçer + 1 skip (`make test`, ~2 dk). CI yeşil (GitHub Actions).
-- Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 + M1-M12 + N1-N12 tamam.
+- 303 unit test geçer + 1 skip (`make test`, ~2 dk). CI yeşil (GitHub Actions).
+- Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 + M1-M12 + N1-N12 + dashboard pro tamam.
 - Simülasyonda uçtan uca otonom görev çalışır.
 - Rapor (`docs/report/884462.pdf`) uyumu: Q1-Q7 kararlar korundu, ihlal yok.
 
@@ -125,7 +125,21 @@ kokpit-uav/
 | — | hardening: param hash + dash auth + CI | `62bf041` | — |
 | — | saha otomasyonu: dash_pw + weather + Make | `b4dfa73` | — |
 
-Toplam 14 commit, 62 yeni test (208 → 270), 18 yeni dosya, ~2500 LOC.
+### Dashboard / observability genişletme (15 madde)
+
+| Madde | Commit | Test |
+|---|---|---|
+| #9+#10 mission event emitter + run dir lifecycle | `1b266ed` | 5 |
+| #12 /health endpoint + bileşen registry | `e0b7576` | 4 |
+| #1+#3+#5 Leaflet map + phase timeline bar + failsafe panel | `a13b604` | 5 |
+| #2+#4 live tail poll + search/filter chips | `b6731e2` | 3 |
+| #6+#7+#8 compare view + download zip + all-time stats | `9ec4c9c` | 7 |
+| #11+#14+#15 live MJPEG iframe + .tlog export + PDF/MD report | `310a272` | 5 |
+| #13 webhook alerter (Slack/Discord/Telegram uyumlu) | `001044e` | 4 |
+
+Toplam: 33 ek test (270 → 303), 7 yeni commit, ~1500 LOC dashboard + event sistemi.
+
+### Önceki iterasyonlar: 14 commit, 62 yeni test (146 → 208 → 270), 18 yeni dosya, ~2500 LOC.
 
 ### M1-M12 (önceki iterasyon)
 
