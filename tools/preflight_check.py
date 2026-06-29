@@ -56,7 +56,11 @@ RESET = "\033[0m"
 class PreflightCheck:
     """Arm öncesi 12 kontrol. Mock injection ile test edilebilir."""
 
-    EXPECTED_PARAM_HASH: Optional[str] = None  # ayarlanırsa hash karşılaştır
+    # ardupilot/kokpit_baseline.param sha256 — değişirse param değişti demektir
+    # Yeni hash hesaplama: sha256sum ardupilot/kokpit_baseline.param
+    EXPECTED_PARAM_HASH: Optional[str] = (
+        "9cf9f7983be1bfd24c29070e67009aa3ade1d4b3e2f493afa3d240eaefe2a431"
+    )
 
     def __init__(self,
                  telemetry_provider: Optional[Callable] = None,
@@ -75,7 +79,7 @@ class PreflightCheck:
         self.trt_ready = trt_ready
         self.systemd_status = systemd_status
         self.param_file = param_file or (ROOT / "ardupilot" / "kokpit_baseline.param")
-        self.expected_param_hash = expected_param_hash
+        self.expected_param_hash = expected_param_hash or self.EXPECTED_PARAM_HASH
         self.require_systemd = require_systemd
         self.results: list[CheckResult] = []
 

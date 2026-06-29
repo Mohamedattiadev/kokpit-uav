@@ -36,3 +36,28 @@ jobs:
           KOKPIT_SIM: "1"
         timeout-minutes: 3
         run: python3 simulation/software_demo.py
+
+  scenario-tests:
+    # N2 — Gazebo SDF + senaryo skript syntax doğrulaması.
+    # gz binary kurulu değilse senaryo davranışı pytest'te zaten doğrulanıyor;
+    # bu job sadece SDF parse + script çağrılabilirlik kontrolü yapar.
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'pull_request'
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - name: Validate SDF XML
+        run: |
+          python3 -c "import xml.etree.ElementTree as ET; \
+            [ET.parse(p) for p in __import__('pathlib').Path('simulation/gazebo').rglob('*.sdf')]; \
+            print('SDF OK')"
+      - name: Scenario import smoke
+        run: |
+          cd simulation/gazebo/scenarios
+          for s in 01_happy_path 02_marker_lost 03_face_mismatch 04_link_lost 05_battery_low 06_gps_lost; do
+            python3 "$s.py"
+          done

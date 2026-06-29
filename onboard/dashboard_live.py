@@ -130,7 +130,18 @@ def stop_producer():
 
 def main():
     port = int(os.environ.get("KOKPIT_DASH_PORT", "8080"))
-    app.run(host="0.0.0.0", port=port)
+    pw = os.environ.get("KOKPIT_DASH_PW")
+    allow_open = os.environ.get("KOKPIT_DASH_ALLOW_OPEN") == "1"
+    host = os.environ.get("KOKPIT_DASH_HOST", "0.0.0.0")
+    if host == "0.0.0.0" and not pw and not allow_open:
+        print("[DASH] HATA: 0.0.0.0 bind + auth yok. KOKPIT_DASH_PW set et "
+              "veya KOKPIT_DASH_ALLOW_OPEN=1 (yarışma sahası). Çıkılıyor.")
+        return 1
+    if host == "0.0.0.0" and not pw:
+        print("[DASH] UYARI: dashboard auth'suz açık (saha alanı). "
+              "Production'da KOKPIT_DASH_PW kullan.")
+    app.run(host=host, port=port)
+    return 0
 
 
 if __name__ == "__main__":
