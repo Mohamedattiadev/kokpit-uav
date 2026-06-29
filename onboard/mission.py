@@ -106,19 +106,29 @@ class Mission:
         n = self.verifier.load_dataset()
         if n == 0:
             print("[GÖREV] UYARI: kayıtlı yüz yok — biyometrik doğrulama başarısız olur")
-        # N4 — telemetry recorder
+        # N4+#10 — run dizini lifecycle (recorder + event logger aynı dizine)
+        self._run_dir = None
         self._recorder = None
+        self._event_logger = None
         if not CFG.simulation or os.environ.get("KOKPIT_RECORD") == "1":
             try:
+                import event_logger as _evl
+                self._run_dir = _evl.make_run_dir()
+                self._event_logger = _evl.EventLogger(
+                    self._run_dir / "events.jsonl")
+                _evl.set_global(self._event_logger)
+                self._event_logger.emit("start", sim=CFG.simulation,
+                                        sysid=CFG.link.target_sysid)
                 from telemetry_recorder import TelemetryRecorder
                 self._recorder = TelemetryRecorder(
                     telemetry_provider=lambda: self.drone.telemetry(),
                     mission_state_provider=lambda: self.fsm.state.name,
                     failsafe_provider=lambda: bool(self._failsafe_heap),
+                    out_path=self._run_dir / "telemetry.csv",
                 )
                 self._recorder.start()
             except Exception as e:
-                print(f"[GÖREV] recorder başlatılamadı: {e}")
+                print(f"[GÖREV] recorder/event logger başlatılamadı: {e}")
         self._start_failsafe_monitor()
 
     def _ensure_camera(self):
@@ -240,6 +250,11 @@ class Mission:
         self._abort_reason = reason
         self._cancel_event.set()   # blocking loop'lar bunu polluyor
         print(f"[FAILSAFE] !!! ABORT: {reason}")
+        try:
+            import event_logger as _evl
+            _evl.emit("abort", reason=reason)
+        except Exception:
+            pass
 
     def abort_check(self) -> bool:
         # LoRa'dan gelen ABORT da dikkate alınır
@@ -460,6 +475,12 @@ class Mission:
             self.fsm.transition(MissionState.RETURN_HOME, force=True)
             return
         self.package_delivered = True
+        try:
+            import event_logger as _evl
+            _evl.emit("package_delivered",
+                      recipient_id=getattr(self.target, "recipient_id", None))
+        except Exception:
+            pass
         # Bırakıştan sonra biraz yüksel (güvenli RTL için)
         print("[GÖREV] Bırakış sonrası yükseliyor")
         t = self.drone.telemetry()
@@ -535,6 +556,17 @@ class Mission:
 
     def close(self):
         self._monitor_running = False
+        evl = getattr(self, "_event_logger", None)
+        if evl:
+            try:
+                evl.emit("mission_end",
+                         delivered=self.package_delivered,
+                         abort=self._abort, reason=self._abort_reason)
+                evl.close()
+                import event_logger as _evl
+                _evl.set_global(None)
+            except Exception:
+                pass
         rec = getattr(self, "_recorder", None)
         if rec:
             try:

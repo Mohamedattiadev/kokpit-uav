@@ -79,8 +79,14 @@ class StateMachine:
             self.log(f"[FSM] UYARI: geçersiz geçiş {self.state.name} -> "
                      f"{new_state.name} (force ile yapıldı)")
         self.log(f"[FSM] {self.state.name} -> {new_state.name}")
+        prev = self.state
         self.state = new_state
         self.history.append((time.time(), new_state))
+        try:
+            import event_logger as _evl
+            _evl.emit("phase", state=new_state.name, prev=prev.name)
+        except Exception:
+            pass
         return True
 
     def is_terminal(self) -> bool:
