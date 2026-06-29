@@ -1,7 +1,7 @@
 # Kokpit UAV
 
 [![CI](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-203%20passed-brightgreen)
+![tests](https://img.shields.io/badge/tests-270%20passed-brightgreen)
 ![status](https://img.shields.io/badge/yaz%C4%B1l%C4%B1m-tamam-brightgreen)
 ![donanim](https://img.shields.io/badge/donan%C4%B1m-bekleniyor-yellow)
 
@@ -101,11 +101,33 @@ kokpit-uav/
 
 **Yazılım tarafı tamamlandı.**
 
-- 203 unit test geçer (`make test`, ~2 dk). CI yeşil (GitHub Actions).
-- Sprint 0 + Sprint 1 (uçuş güvenliği) + Sprint 2 (rapor uyumu) + Sprint 3 (operasyon kalitesi) tamam.
+- 270 unit test geçer + 1 skip (`make test`, ~2 dk). CI yeşil (GitHub Actions).
+- Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 + M1-M12 + N1-N12 tamam.
 - Simülasyonda uçtan uca otonom görev çalışır.
+- Rapor (`docs/report/884462.pdf`) uyumu: Q1-Q7 kararlar korundu, ihlal yok.
 
-Tamamlanan 12 ana modül:
+### N1-N12 (FINISH_SOFTWARE_PROMPT_V2 final iterasyon)
+
+| # | Madde | Commit | Test |
+|---|---|---|---|
+| N1 | preflight_check.py — arm öncesi 12 kontrol | `6096675` | 14 |
+| N2 | Gazebo SITL + 6 senaryo (SDF + skript) | `8e3d0e4` | 8 |
+| N3 | replay dashboard (Flask timeline + plot) | `b7020d0` | 5 |
+| N4 | telemetry recorder (forensic CSV 1 Hz) | `ac74024` | 4 |
+| N5 | sysid çakışma koruma + scan_sysid | `d13dac7` | 4 |
+| N6 | hava durumu pre-check (Open-Meteo) | `d810d4c` | 6 |
+| N7 | AutoTune headless orchestrator | `c42ed01` | 4 |
+| N8 | live MJPEG stream + ArUco overlay | `9da43e9` | 5 |
+| N9 | ESP32 hot swap BOOT_BEACON station_id | `c44d3f7` | 4 |
+| N10 | SAHA_KART.md + make print-card | `c852b1d` | — |
+| N11 | runs/ index + aylık tar.gz archive | `ba8af10` | 3 |
+| N12 | final integration smoke (uçtan uca) | `ccd91a1` | 5 |
+| — | hardening: param hash + dash auth + CI | `62bf041` | — |
+| — | saha otomasyonu: dash_pw + weather + Make | `b4dfa73` | — |
+
+Toplam 14 commit, 62 yeni test (208 → 270), 18 yeni dosya, ~2500 LOC.
+
+### M1-M12 (önceki iterasyon)
 
 | # | Modül | Açıklama |
 |---|---|---|
@@ -128,6 +150,17 @@ Tamamlanan 12 ana modül:
 2. **Extrinsics kalibrasyon.** Kamera + lidar gövdeye monte edildikten sonra cetvelle ölçü alınıp `tools/calibrate_extrinsics.py` ile kaydedilmeli. Yapılmazsa iniş 5-10 cm kayar.
 3. **ESP32 RX parser.** Drone'dan gelen TELEMETRY paketini yer istasyonu TFT'sinde göstermek için firmware'e parser eklenecek. Saha öncesi ikinci bir firmware PR'ı.
 4. **Saha test uçuşları.** ArduCopter PID tune + manuel → stabilize → loiter → guided kademe testleri.
+
+### N1-N12 sahada yapılacak (yazılım hazır, donanım/insan gerekir)
+
+- Gerçek `tools/preflight_check.py` Pixhawk+Jetson takılı haldeyken 12/12 PASS.
+- `gz sim` kurulu Jetson'da `bash simulation/gazebo/run_scenarios.sh` 6 senaryo gerçek fizik.
+- AutoTune ilk uçuş: `python3 tools/autotune.py` orchestrator + pilot RC AUTOTUNE switch.
+- `sudo bash scripts/gen_dash_pw.sh` (Jetson'da, /etc/kokpit/dash_pw secret üretir).
+- `/etc/kokpit/site` dosyasına `KOKPIT_LAT=` ve `KOKPIT_LON=` saha koordinatları.
+- `sudo systemctl enable --now kokpit-weather.timer kokpit-runs-archive.timer`.
+- `docs/SAHA_KART.md` telefon alanları doldur, `make print-card` ile A4 yazdır.
+- Param tune sonrası `make refresh-param-hash` ile preflight hash güncelle.
 
 Donanım ekibi için tam detaylı plan (malzeme listesi, komutlar, doğrulama checklist'i, sorun giderme): [`docs/DONANIM_PLANI.md`](docs/DONANIM_PLANI.md).
 
