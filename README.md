@@ -135,7 +135,10 @@ Donanım ekibi için tam detaylı plan (malzeme listesi, komutlar, doğrulama ch
 
 ## Güvenlik Notları
 
-**Pilot her zaman önceliklidir.** Radyo kumandası Manual moduna alındığında otonom kontrol kendiliğinden devre dışı kalır; drone read-only moduna geçer.
+**Pilot her zaman önceliklidir.** Manuel kontrol iki yolla alınabilir:
+
+1. **RC kumanda mode switch** (birincil yol, anlık). Pilot RC üzerinden MANUAL / STABILIZE / ACRO moduna geçtiğinde Jetson otomatik tanır, komut göndermeyi keser. ArduCopter zaten pilot stick'lerini birinci kabul eder.
+2. **LoRa MANUAL_REQUEST paketi** (yedek, RC link zayıfsa). Yer istasyonundaki butonla `LOITER` veya istenen moda alma talebi gönderilir. Drone `set_mode(LOITER)` yapar + Jetson komut göndermeyi keser; pilot sonra RC ile istediği moda alır.
 
 Failsafe katmanları (otomatik RTL veya LAND tetikler):
 - Batarya voltaj eşiği (6S için 22.0 V düşük, 21.0 V kritik)

@@ -66,6 +66,8 @@ class MsgType(IntEnum):
     HEARTBEAT = 5            # canlılık
     TELEMETRY = 6            # İHA → yer (durum + RSSI)
     ACK = 7                  # paket onayı
+    MANUAL_REQUEST = 8       # yer istasyonu → drone: Jetson kontrolü bırak,
+                             # pilot manuel uçuracak (LOITER veya pilot mode)
 
 
 # ----------------------------------------------------------------------------
@@ -284,6 +286,13 @@ def encode_abort(seq: int = 0) -> bytes:
 
 def encode_heartbeat(seq: int = 0) -> bytes:
     return _frame(MsgType.HEARTBEAT, seq, 0, 1, b"")
+
+
+def encode_manual_request(target_mode: str = "LOITER", seq: int = 0) -> bytes:
+    """Yer istasyonu → drone: pilot kontrol istiyor. target_mode='LOITER'
+    güvenli hover; pilot RC ile ardından istediği moda alır."""
+    payload = target_mode.encode("ascii")[:16].ljust(16, b"\x00")
+    return _frame(MsgType.MANUAL_REQUEST, seq, 0, 1, payload)
 
 
 def encode_boot_beacon(seq_start: int, fw_version: int = 1) -> bytes:

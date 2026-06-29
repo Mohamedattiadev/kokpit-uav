@@ -433,6 +433,10 @@ Yapacaklar:
 4) loss > 30 || rssi < -100 ise buzzer kısa beep (her 3 sn).
 5) packet_protocol.py içindeki replay LRU mantığını ESP32 tarafında da
    uygula (son 64 seq tut, tekrar gelirse drop).
+6) ESP32'ye İKİNCİ buton (veya uzun basış kombinasyonu) ekle:
+   MANUAL_REQUEST paketi gönderir (encode_manual_request("LOITER")).
+   TFT'de "MANUAL TALEP GÖNDERİLDİ" göster, drone LOITER'a geçer.
+   Buton kısa bas: paket teslimat. Uzun bas: ABORT. Çift bas: MANUAL.
 
 Kurallar:
 - Mevcut TX yolu (button → sendFaceDelivery) bozulmamalı.

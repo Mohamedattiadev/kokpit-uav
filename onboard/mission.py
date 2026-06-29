@@ -65,6 +65,7 @@ class Mission:
         self._failsafe_lock = threading.Lock()
         self._cancel_event = threading.Event()   # phase task cancellation
         self.watchdog = Watchdog(period_s=5.0)
+        self._manual_requested = False
 
     # =====================================================================
     # Kurulum
@@ -218,6 +219,20 @@ class Mission:
         if self.lora and getattr(self.lora, "abort_requested", False):
             if not self._abort:
                 self.request_abort("Yer istasyonu ABORT")
+        # LoRa MANUAL_REQUEST: pilot kontrol istiyor (RC link zayıfsa
+        # acil "bırak" çağrısı). Hedef mod LOITER (güvenli hover);
+        # pilot ardından RC ile istediği moda alır.
+        if self.lora and getattr(self.lora, "manual_requested", False):
+            if not self._manual_requested:
+                self._manual_requested = True
+                target = getattr(self.lora, "manual_target_mode", "LOITER")
+                print(f"[GÖREV] MANUAL_REQUEST: {target} moduna geç + komut durdur")
+                try:
+                    self.drone.set_mode(target)
+                except Exception as e:
+                    print(f"[GÖREV] set_mode {target} hatası: {e}")
+                self.request_abort(
+                    f"[PILOT_OVERRIDE] LoRa MANUAL_REQUEST -> {target}")
         return self._abort
 
     # =====================================================================
@@ -466,6 +481,18 @@ class Mission:
 
     def _do_abort(self):
         print(f"[GÖREV] ABORT işleniyor: {self._abort_reason}")
+        # PILOT_OVERRIDE — pilot kumandayı aldı, Jetson set_mode çağırırsa
+        # çakışır. Hiç komut gönderme, sadece pilot disarm edene kadar bekle.
+        if "PILOT_OVERRIDE" in self._abort_reason:
+            print("[GÖREV] Pilot kontrolde — Jetson pasif, sadece izliyor.")
+            start = time.time()
+            while time.time() - start < CFG.safety.navigation_timeout_s:
+                t = self.drone.telemetry()
+                if not t.armed:
+                    break
+                time.sleep(0.5)
+            self.fsm.transition(MissionState.DISARM, force=True)
+            return
         # Kritik batarya/link ise RTL en güvenlisi (ArduPilot kendi failsafe'i de var)
         try:
             self.drone.set_mode("RTL")

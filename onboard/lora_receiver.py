@@ -39,6 +39,8 @@ class BaseLoRaReceiver:
         self.reassembler = ImageReassembler()
         self._delivery_q: "queue.Queue" = queue.Queue()
         self.abort_requested = False
+        self.manual_requested = False
+        self.manual_target_mode: str = "LOITER"
         self.peer_seq_start: Optional[int] = None   # BOOT_BEACON'dan
         # M7 — link kalitesi telemetri
         self._rx_window: list[float] = []   # son saniye paket varış zamanları
@@ -133,6 +135,14 @@ class BaseLoRaReceiver:
         elif pkt.msg_type == MsgType.ABORT:
             self.abort_requested = True
             print("[LORA] ABORT paketi alındı")
+        elif pkt.msg_type == MsgType.MANUAL_REQUEST:
+            self.manual_requested = True
+            try:
+                self.manual_target_mode = pkt.payload.rstrip(b"\x00").decode(
+                    "ascii", errors="ignore") or "LOITER"
+            except Exception:
+                self.manual_target_mode = "LOITER"
+            print(f"[LORA] MANUAL_REQUEST alındı -> {self.manual_target_mode}")
 
     def wait_for_delivery(self, timeout: Optional[float] = None):
         """Geçerli bir teslimat talebi gelene kadar bekle.
