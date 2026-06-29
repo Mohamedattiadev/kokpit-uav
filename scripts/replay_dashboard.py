@@ -534,6 +534,207 @@ setInterval(refresh, 5000);
 """)
 
 RUN_HTML = (BASE_CSS + """
+<style>
+/* Big status hero */
+.hero {
+  position: relative;
+  border-radius: 16px;
+  padding: 32px 36px;
+  margin-bottom: 28px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.hero.ok { background: radial-gradient(circle at top right, rgba(63,185,80,.18), transparent 60%), var(--bg-1); border-color: rgba(63,185,80,.3); }
+.hero.err { background: radial-gradient(circle at top right, rgba(248,81,73,.18), transparent 60%), var(--bg-1); border-color: rgba(248,81,73,.3); }
+.hero.warn { background: radial-gradient(circle at top right, rgba(210,153,34,.18), transparent 60%), var(--bg-1); border-color: rgba(210,153,34,.3); }
+.hero-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; flex-wrap: wrap; }
+.hero-left { flex: 1; min-width: 280px; }
+.hero-status {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .14em;
+  padding: 6px 12px; border-radius: 20px;
+  margin-bottom: 14px;
+}
+.hero.ok .hero-status { background: rgba(63,185,80,.18); color: var(--ok); }
+.hero.err .hero-status { background: rgba(248,81,73,.18); color: var(--err); }
+.hero.warn .hero-status { background: rgba(210,153,34,.18); color: var(--warn); }
+.hero-name {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; color: var(--text-soft);
+  margin-bottom: 8px;
+}
+.hero-headline {
+  font-size: 28px; font-weight: 700; letter-spacing: -0.025em;
+  line-height: 1.2; margin: 0 0 14px;
+  max-width: 720px;
+}
+.hero-desc {
+  font-size: 16px; color: var(--text-dim);
+  line-height: 1.6; max-width: 720px;
+}
+.hero-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--bg-2); border: 1px solid var(--border);
+  color: var(--text); text-decoration: none;
+  padding: 8px 14px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; cursor: pointer;
+  transition: all .15s ease;
+}
+.btn:hover { border-color: var(--border-strong); background: var(--bg-3); }
+.btn svg { width: 14px; height: 14px; }
+
+/* KPI grid */
+.kpis {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 28px;
+}
+.kpi {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  position: relative;
+}
+.kpi-icon {
+  position: absolute; top: 18px; right: 18px;
+  color: var(--text-soft); opacity: .5;
+}
+.kpi-label {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: .1em;
+  font-weight: 600; margin-bottom: 6px;
+}
+.kpi-value {
+  font-size: 26px; font-weight: 700; letter-spacing: -0.02em;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.1;
+}
+.kpi-sub { font-size: 11px; color: var(--text-soft); margin-top: 4px; }
+
+/* Phase stepper */
+.stepper {
+  display: flex; align-items: center;
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+  margin-bottom: 14px;
+  overflow-x: auto;
+}
+.step {
+  display: flex; align-items: center;
+  flex-shrink: 0; gap: 10px;
+  padding-right: 20px; position: relative;
+}
+.step:not(:last-child)::after {
+  content: ""; width: 28px; height: 2px;
+  background: var(--border);
+  margin-left: 10px;
+  display: inline-block;
+}
+.step.done:not(:last-child)::after { background: var(--ok); }
+.step-circle {
+  width: 28px; height: 28px; border-radius: 50%;
+  display: grid; place-items: center;
+  background: var(--bg-3); border: 1.5px solid var(--border);
+  color: var(--text-soft); flex-shrink: 0;
+}
+.step.done .step-circle { background: var(--ok); border-color: var(--ok); color: #0d1117; }
+.step.current .step-circle { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); animation: pulse 1.8s infinite; }
+.step.err .step-circle { background: var(--err-soft); border-color: var(--err); color: var(--err); }
+.step-label {
+  font-size: 12px; font-weight: 500;
+  color: var(--text-soft); white-space: nowrap;
+}
+.step.done .step-label, .step.current .step-label { color: var(--text); }
+.step.err .step-label { color: var(--err); }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(88,166,255,.4); }
+  50%      { box-shadow: 0 0 0 8px rgba(88,166,255,0); }
+}
+
+/* Timeline (cleaner cards) */
+.tl-card {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.tl-row {
+  display: grid;
+  grid-template-columns: 64px 44px 1fr;
+  align-items: center; gap: 14px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  transition: background .12s ease;
+}
+.tl-row:last-child { border-bottom: none; }
+.tl-row:hover { background: var(--bg-2); }
+.tl-time {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px; color: var(--text-soft);
+  font-weight: 500;
+}
+.tl-ic {
+  width: 36px; height: 36px;
+  display: grid; place-items: center;
+  border-radius: 9px;
+  background: var(--bg-3);
+  color: var(--text-dim);
+}
+.tl-ic svg { width: 18px; height: 18px; }
+.tl-ic.ok { background: var(--ok-soft); color: var(--ok); }
+.tl-ic.err { background: var(--err-soft); color: var(--err); }
+.tl-ic.warn { background: var(--warn-soft); color: var(--warn); }
+.tl-ic.violet { background: rgba(163,113,247,.15); color: var(--violet); }
+.tl-ic.pink { background: rgba(219,97,162,.15); color: var(--pink); }
+.tl-ic.accent { background: var(--accent-soft); color: var(--accent); }
+.tl-text { min-width: 0; }
+.tl-name { font-size: 14px; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+.tl-detail {
+  font-size: 12px; color: var(--text-soft);
+  font-family: 'JetBrains Mono', monospace;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+.panel {
+  background: var(--bg-1);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 20px;
+}
+.panel-title {
+  font-size: 13px; font-weight: 600;
+  color: var(--text); margin: 0 0 4px;
+}
+.panel-hint { font-size: 12px; color: var(--text-soft); margin-bottom: 14px; }
+
+.map-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-1);
+  position: sticky; top: 80px;
+}
+.map-legend {
+  padding: 12px 14px; font-size: 12px;
+  border-top: 1px solid var(--border);
+  display: flex; gap: 16px; flex-wrap: wrap;
+  color: var(--text-soft);
+}
+.map-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+
+.two-col { display: grid; grid-template-columns: 1fr 400px; gap: 22px; align-items: start; }
+@media (max-width: 1024px) {
+  .two-col { grid-template-columns: 1fr; }
+  .map-card { position: static !important; }
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+
 <nav class="nav"><div class="nav-inner">
   <a href="/" class="brand" style="text-decoration:none;color:inherit">
     <div class="brand-mark">""" + LOGO_SVG + """</div>
@@ -544,115 +745,111 @@ RUN_HTML = (BASE_CSS + """
 </div></nav>
 
 <div class="wrap">
-  <a class="back" href="/">""" + ICON["arrow_left"] + """ All runs</a>
-  <div class="run-header">
-    <div>
-      <h1 class="run-title">{{ name }}</h1>
-      <div class="run-sub">{{ events|length }} events · {{ tel_rows }} telemetry rows</div>
-    </div>
-    <div style="display:flex;gap:8px;align-items:center">
-      {% if delivered %}<span class="chip ok">""" + ICON["package"] + """ delivered</span>
-      {% elif abort_reason %}<span class="chip err">""" + ICON["octagon_x"] + """ {{ abort_reason }}</span>
-      {% else %}<span class="chip warn">incomplete</span>{% endif %}
-      <a href="/run/{{ name }}/download.zip" class="chip" style="text-decoration:none">⬇ Download</a>
-      <select id="compare-pick" style="background:var(--bg-1);border:1px solid var(--border);color:var(--text-dim);padding:5px 8px;border-radius:5px;font-size:11px;font-family:'JetBrains Mono',monospace">
-        <option value="">Compare with…</option>
-      </select>
-    </div>
-  </div>
-<script>
-(async function() {
-  const me = {{ name|tojson }};
-  const r = await fetch('/api/runs');
-  const data = await r.json();
-  const sel = document.getElementById('compare-pick');
-  data.runs.filter(x => x.name !== me).forEach(x => {
-    const opt = document.createElement('option');
-    opt.value = x.name; opt.textContent = x.name;
-    sel.appendChild(opt);
-  });
-  sel.addEventListener('change', e => {
-    if (e.target.value) location.href = `/compare?a=${me}&b=${encodeURIComponent(e.target.value)}`;
-  });
-})();
-</script>
+  <a class="back" href="/">""" + ICON["arrow_left"] + """ Tüm görevler</a>
 
-  <!-- Friendly summary (en üstte, herkes okuyabilir) -->
-  <div class="summary-card">
-    <div class="summary-icon">
-      {% if delivered %}""" + ICON["package"] + """
-      {% elif abort_reason %}""" + ICON["octagon_x"] + """
-      {% else %}""" + ICON["alert"] + """{% endif %}
-    </div>
-    <div>
-      <div class="summary-title">Görev özeti</div>
-      <div class="summary-text">{{ human_summary }}</div>
+  <!-- HERO: status + name + headline + summary -->
+  {% set tone = 'ok' if delivered else ('err' if abort_reason else 'warn') %}
+  <div class="hero {{ tone }}">
+    <div class="hero-row">
+      <div class="hero-left">
+        <div class="hero-status">
+          {% if delivered %}""" + ICON["package"] + """ <span>Başarılı teslimat</span>
+          {% elif abort_reason %}""" + ICON["octagon_x"] + """ <span>Görev iptal — {{ abort_reason }}</span>
+          {% else %}""" + ICON["alert"] + """ <span>Tamamlanamadı</span>{% endif %}
+        </div>
+        <div class="hero-name">{{ name }}</div>
+        <h1 class="hero-headline">
+          {% if delivered %}Paket başarıyla teslim edildi.
+          {% elif abort_reason %}Görev güvenlik nedeniyle iptal edildi.
+          {% else %}Görev tamamlanamadı.{% endif %}
+        </h1>
+        <p class="hero-desc">{{ human_summary }}</p>
+      </div>
+      <div class="hero-actions">
+        <a href="/run/{{ name }}/download.zip" class="btn">⬇ Verileri indir</a>
+        <a href="/run/{{ name }}/report.md" class="btn" target="_blank">📄 Rapor</a>
+        <select id="compare-pick" class="btn" style="appearance:none;padding-right:24px">
+          <option value="">⇄ Karşılaştır…</option>
+        </select>
+      </div>
     </div>
   </div>
 
-  <div class="stats" style="grid-template-columns:repeat(4,1fr)">
-    <div class="stat">
-      <div class="stat-label">""" + ICON["clock"] + """ Süre</div>
-      <div class="stat-value mono">{{ '%d:%02d'|format(duration_s // 60, duration_s % 60) }}</div>
+  <!-- Phase stepper -->
+  <div class="stepper" id="stepper">Yükleniyor…</div>
+
+  <!-- KPI cards -->
+  <div class="kpis">
+    <div class="kpi">
+      <div class="kpi-icon">""" + ICON["clock"] + """</div>
+      <div class="kpi-label">Süre</div>
+      <div class="kpi-value">{{ '%d:%02d'|format(duration_s // 60, duration_s % 60) }}</div>
+      <div class="kpi-sub">dakika:saniye</div>
     </div>
-    <div class="stat">
-      <div class="stat-label">""" + ICON["plane_up"] + """ Max irtifa</div>
-      <div class="stat-value mono">{{ '%.0f'|format(tel_stats.max_alt or 0) }} m</div>
+    <div class="kpi">
+      <div class="kpi-icon">""" + ICON["plane_up"] + """</div>
+      <div class="kpi-label">En yüksek irtifa</div>
+      <div class="kpi-value">{{ '%.0f'|format(tel_stats.max_alt or 0) }} m</div>
+      <div class="kpi-sub">yerden uzaklık</div>
     </div>
-    <div class="stat">
-      <div class="stat-label">""" + ICON["activity"] + """ Olay sayısı</div>
-      <div class="stat-value mono">{{ events|length }}</div>
+    <div class="kpi">
+      <div class="kpi-icon">""" + ICON["activity"] + """</div>
+      <div class="kpi-label">Olay</div>
+      <div class="kpi-value">{{ events|length }}</div>
+      <div class="kpi-sub">kaydedilen aşama</div>
     </div>
-    <div class="stat">
-      <div class="stat-label">""" + ICON["satellite"] + """ Telemetry</div>
-      <div class="stat-value mono">{{ tel_rows }}</div>
+    <div class="kpi">
+      <div class="kpi-icon">""" + ICON["satellite"] + """</div>
+      <div class="kpi-label">Batarya harcaması</div>
+      <div class="kpi-value">{{ '%.1f'|format(tel_stats.battery_drop or 0) }} V</div>
+      <div class="kpi-sub">başlangıçtan sona</div>
     </div>
   </div>
 
-  <!-- 2-column layout: sol içerik | sağ harita (sticky) -->
+  <!-- 2-column: timeline+plot | map -->
   <div class="two-col">
-    <div class="col-main">
-      <div class="section-label">Olay zaman çizelgesi</div>
-      <div class="timeline">
+    <div>
+      <div class="section-label">Görev aşamaları</div>
+      <div class="panel">
+        <div class="panel-hint">Görev her aşamada ne kadar zaman geçirdi:</div>
+        <div id="phases"></div>
+        <div id="phase-legend" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:10px;font-size:11px;color:var(--text-dim)"></div>
+      </div>
+
+      <div class="section-label">Olaylar</div>
+      <div class="tl-card">
         {% for e in events %}
-        <div class="event">
-          <div class="t">{{ '%d:%02d'|format(e.dt // 60, e.dt % 60) }}</div>
-          <div class="ic {{ e.tone }}">{{ e.icon|safe }}</div>
-          <div>
-            <div class="name">{{ e.label }}</div>
-            {% if e.detail %}<div class="detail">{{ e.detail }}</div>{% endif %}
+        <div class="tl-row">
+          <div class="tl-time">{{ '%d:%02d'|format(e.dt // 60, e.dt % 60) }}</div>
+          <div class="tl-ic {{ e.tone }}">{{ e.icon|safe }}</div>
+          <div class="tl-text">
+            <div class="tl-name">{{ e.label }}</div>
+            {% if e.detail %}<div class="tl-detail">{{ e.detail }}</div>{% endif %}
           </div>
         </div>
         {% endfor %}
       </div>
 
       {% if tel_rows > 0 %}
-      <div class="section-label">Görev aşamaları</div>
-      <div class="plot-card" style="padding:14px 18px">
-        <div style="color:var(--text-soft);font-size:12px;margin-bottom:8px">
-          Görevin hangi aşamada ne kadar zaman geçirdiği:
-        </div>
-        <div id="phases"></div>
-        <div id="phase-legend" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--text-dim)"></div>
+      <div class="section-label">İrtifa ve batarya</div>
+      <div class="panel" style="padding:0;overflow:hidden">
+        <img src="/run/{{ name }}/plot.png" alt="plot" style="width:100%;display:block"/>
       </div>
 
-      <div class="section-label">İrtifa ve batarya</div>
-      <div class="plot-card"><img src="/run/{{ name }}/plot.png" alt="plot"/></div>
-
       <div class="section-label">Güvenlik uyarıları</div>
-      <div class="plot-card" id="failsafe-panel" style="padding:14px 18px;font-size:13px">Yükleniyor…</div>
+      <div class="panel" id="failsafe-panel" style="font-size:13px">Yükleniyor…</div>
       {% endif %}
     </div>
 
     {% if tel_rows > 0 %}
-    <aside class="col-side">
+    <aside>
       <div class="section-label" style="margin-top:0">Uçuş rotası</div>
-      <div class="plot-card" style="padding:0;position:sticky;top:80px">
-        <div id="map" style="height:520px;width:100%;background:var(--bg-2);border-radius:10px"></div>
-        <div style="padding:10px 14px;font-size:11px;color:var(--text-soft);border-top:1px solid var(--border);display:flex;gap:14px">
-          <span><span style="display:inline-block;width:8px;height:8px;background:#3fb950;border-radius:50%;margin-right:5px"></span>Başlangıç</span>
-          <span><span style="display:inline-block;width:8px;height:8px;background:#d29922;border-radius:50%;margin-right:5px"></span>Bitiş</span>
-          <span><span style="display:inline-block;width:14px;height:2px;background:#58a6ff;vertical-align:middle;margin-right:5px"></span>Uçuş yolu</span>
+      <div class="map-card">
+        <div id="map" style="height:560px;background:var(--bg-2)"></div>
+        <div class="map-legend">
+          <span><span class="dot" style="background:#3fb950"></span>Başlangıç</span>
+          <span><span class="dot" style="background:#d29922"></span>Bitiş</span>
+          <span><span class="dot" style="background:#58a6ff;width:14px;height:2px;border-radius:0"></span>Uçuş yolu</span>
         </div>
       </div>
     </aside>
@@ -735,6 +932,55 @@ RUN_HTML = (BASE_CSS + """
     });
     document.getElementById('phase-legend').innerHTML = legend;
   } catch(e) { console.error(e); }
+
+  // Compare picker wiring
+  try {
+    const r = await fetch('/api/runs');
+    const data = await r.json();
+    const sel = document.getElementById('compare-pick');
+    if (sel) {
+      data.runs.filter(x => x.name !== name).forEach(x => {
+        const o = document.createElement('option');
+        o.value = x.name; o.textContent = x.name;
+        sel.appendChild(o);
+      });
+      sel.addEventListener('change', e => {
+        if (e.target.value) location.href = `/compare?a=${name}&b=${encodeURIComponent(e.target.value)}`;
+      });
+    }
+  } catch(e) {}
+
+  // Phase stepper (canonical mission flow)
+  try {
+    const FLOW = [
+      ['WAIT_PACKET', 'Bekleme', '""" + "play" + """'],
+      ['TAKEOFF', 'Kalkış', 'plane_up'],
+      ['NAVIGATE', 'Hedefe gidiş', 'plane'],
+      ['SEARCH_MARKER', 'İşaret', 'crosshair'],
+      ['PRECISION_APPROACH', 'Yaklaşım', 'arrow_down'],
+      ['BIOMETRIC_VERIFY', 'Yüz', 'user_check'],
+      ['DROP_PACKAGE', 'Teslim', 'package'],
+      ['RETURN_HOME', 'Dönüş', 'home'],
+    ];
+    const r = await fetch(`/run/${name}/phases.json`);
+    const data = await r.json();
+    const visited = new Set(data.phases.map(p => p.state));
+    const aborted = visited.has('ABORT') || visited.has('FAILED');
+    const current = data.phases.length ? data.phases[data.phases.length - 1].state : null;
+    const step = document.getElementById('stepper');
+    step.innerHTML = '';
+    FLOW.forEach(([st, lbl, ic]) => {
+      let cls = '';
+      if (visited.has(st)) cls = 'done';
+      if (st === current && !aborted) cls = 'current';
+      if (aborted && current === st) cls = 'err';
+      const html = `<div class="step ${cls}">
+        <div class="step-circle">${cls==='done' ? '✓' : (cls==='err' ? '✕' : '·')}</div>
+        <div class="step-label">${lbl}</div>
+      </div>`;
+      step.insertAdjacentHTML('beforeend', html);
+    });
+  } catch(e) { document.getElementById('stepper').textContent = 'Aşama verisi yüklenemedi'; }
 
   // Failsafe events (TR)
   try {
