@@ -1,0 +1,11 @@
+[Unit]
+Description=Kokpit hava durumu check (Open-Meteo)
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/kokpit-uav
+# KOKPIT_LAT / KOKPIT_LON env'de set edilmeli (saha koordinatları)
+EnvironmentFile=-/etc/kokpit/site
+ExecStart=/usr/bin/python3 tools/weather_check.py --lat ${KOKPIT_LAT} --lon ${KOKPIT_LON}
+StandardOutput=journal
+StandardError=journal

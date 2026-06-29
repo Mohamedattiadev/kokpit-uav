@@ -9,6 +9,9 @@ NotifyAccess=main
 WorkingDirectory=/opt/kokpit-uav
 Environment=KOKPIT_SIM=0
 Environment=PYTHONUNBUFFERED=1
+# N8 — dashboard auth: kurulum öncesi /etc/kokpit/dash_pw dosyası oluştur
+# (`scripts/gen_dash_pw.sh`). Boşsa servis 0.0.0.0 bind reddeder.
+EnvironmentFile=-/etc/kokpit/dash_pw
 ExecStart=/usr/bin/python3 -m onboard.mission
 Restart=on-failure
 RestartSec=3

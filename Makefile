@@ -18,6 +18,16 @@ print-card:
 	  echo "pandoc yok — md görüntüle: cat docs/SAHA_KART.md"; \
 	fi
 
+# N1 — ardupilot/kokpit_baseline.param değişirse hash'i güncelle.
+.PHONY: refresh-param-hash
+refresh-param-hash:
+	@H=$$(sha256sum ardupilot/kokpit_baseline.param | awk '{print $$1}'); \
+	echo "Yeni hash: $$H"; \
+	python3 -c "import re,sys; \
+p='tools/preflight_check.py'; s=open(p).read(); \
+s=re.sub(r'\"[a-f0-9]{64}\"', '\"$$H\"', s, count=1); \
+open(p,'w').write(s); print('OK: preflight_check.py güncellendi')"
+
 install:
 	pip install -r requirements.txt
 
