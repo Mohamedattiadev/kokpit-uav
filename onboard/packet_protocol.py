@@ -295,8 +295,11 @@ def encode_manual_request(target_mode: str = "LOITER", seq: int = 0) -> bytes:
     return _frame(MsgType.MANUAL_REQUEST, seq, 0, 1, payload)
 
 
-def encode_boot_beacon(seq_start: int, fw_version: int = 1) -> bytes:
-    payload = struct.pack("<II", seq_start, fw_version)
+def encode_boot_beacon(seq_start: int, fw_version: int = 1,
+                       station_id: int = 0) -> bytes:
+    """N9: payload 8->12 byte, son u32 = station_id (MAC son 32 bit).
+    station_id=0 ise legacy ESP32 (parser geriye dönük uyumlu)."""
+    payload = struct.pack("<III", seq_start, fw_version, station_id & 0xFFFFFFFF)
     return _frame(MsgType.BOOT_BEACON, seq_start, 0, 1, payload)
 
 

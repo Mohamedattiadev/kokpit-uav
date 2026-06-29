@@ -42,6 +42,7 @@ class BaseLoRaReceiver:
         self.manual_requested = False
         self.manual_target_mode: str = "LOITER"
         self.peer_seq_start: Optional[int] = None   # BOOT_BEACON'dan
+        self.peer_station_id: Optional[int] = None  # N9 — hot swap detect
         # M7 — link kalitesi telemetri
         self._rx_window: list[float] = []   # son saniye paket varış zamanları
         self.last_rssi: float = 0.0         # ESP32 desteklerse, opsiyonel
@@ -92,12 +93,24 @@ class BaseLoRaReceiver:
             import struct
             try:
                 seq_start, fw = struct.unpack("<II", pkt.payload[:8])
+                # N9 — payload 12 byte ise station_id var
+                new_station = None
+                if len(pkt.payload) >= 12:
+                    new_station = struct.unpack("<I", pkt.payload[8:12])[0]
+                if (new_station is not None and
+                        self.peer_station_id is not None and
+                        new_station != self.peer_station_id):
+                    print(f"[LORA] GS hot-swap detected "
+                          f"({self.peer_station_id:#x} -> {new_station:#x})")
+                if new_station is not None:
+                    self.peer_station_id = new_station
                 self.peer_seq_start = seq_start
                 self.parser._seen_set.clear()
                 self.parser._seen_seqs.clear()
                 self._expected_seq = None
                 print(f"[LORA] BOOT_BEACON: peer reboot detected, replay "
-                      f"window reset (seq_start={seq_start} fw={fw})")
+                      f"window reset (seq_start={seq_start} fw={fw} "
+                      f"station={new_station})")
             except Exception:
                 pass
         elif pkt.msg_type == MsgType.DELIVERY_REQUEST:

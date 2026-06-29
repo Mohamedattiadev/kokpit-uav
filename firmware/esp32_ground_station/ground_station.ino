@@ -192,19 +192,29 @@ camera_fb_t* captureFace() {
 }
 #endif
 
-// Boot beacon: Jetson'a yeni seq başlangıç noktasını bildir
+// N9 — MAC son 32 bit'inden station_id türet (hot swap detect)
+uint32_t getStationId() {
+  uint8_t mac[6];
+  esp_efuse_mac_get_default(mac);
+  return ((uint32_t)mac[2] << 24) | ((uint32_t)mac[3] << 16) |
+         ((uint32_t)mac[4] << 8)  | ((uint32_t)mac[5]);
+}
+
+// Boot beacon: Jetson'a yeni seq başlangıç noktasını + station_id bildir
 void sendBootBeacon() {
-  uint8_t payload[8];
+  uint8_t payload[12];
   uint32_t seq_start = g_seq;
+  uint32_t station_id = getStationId();
   memcpy(payload, &seq_start, 4);
   memcpy(payload + 4, &FW_VERSION, 4);
+  memcpy(payload + 8, &station_id, 4);
   uint8_t buf[64];
   size_t n = kokpit_pkt_build(MSG_BOOT_BEACON, seq_start, 0, 1,
                               payload, sizeof(payload), buf, sizeof(buf));
   LoraSerial.write(buf, n);
   LoraSerial.flush();
-  Serial.printf("[BOOT] beacon seq_start=%u fw=0x%04X (%u byte)\n",
-                seq_start, FW_VERSION, n);
+  Serial.printf("[BOOT] beacon seq_start=%u fw=0x%04X station=0x%08X (%u byte)\n",
+                seq_start, FW_VERSION, station_id, n);
 }
 
 bool fillGps(int32_t *lat_e7, int32_t *lon_e7, int32_t *alt_mm,
