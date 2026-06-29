@@ -18,6 +18,7 @@ SITL'de uçtan uca otomatik test için: simulation/test_mission_sitl.py
 from __future__ import annotations
 import heapq
 import math
+import os
 import threading
 import time
 from typing import Optional
@@ -75,6 +76,19 @@ class Mission:
         if errs:
             print("[GÖREV] KONFIG HATALARI:", errs)
             raise RuntimeError("Konfigürasyon doğrulanamadı")
+
+        # N1 — Preflight: gerçek donanımda zorunlu, sim'de opt-in (KOKPIT_PREFLIGHT=1)
+        if not CFG.simulation or os.environ.get("KOKPIT_PREFLIGHT") == "1":
+            from preflight_check import PreflightCheck
+            pf = PreflightCheck(
+                telemetry_provider=lambda: self.drone.telemetry(),
+                require_systemd=not CFG.simulation,
+            )
+            report = pf.run()
+            pf.print_table(report)
+            pf.write_json(report)
+            if not report.passed:
+                raise RuntimeError("Preflight FAIL")
 
         self.drone.connect()
         # M8 — mid-mission reboot: AP autoflight modunda + armed ise READ_ONLY
