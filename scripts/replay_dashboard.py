@@ -285,6 +285,49 @@ body {
 
 a.link { color: var(--accent); text-decoration: none; }
 a.link:hover { text-decoration: underline; }
+
+/* Friendly summary card */
+.summary-card {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 18px; align-items: center;
+  background: linear-gradient(135deg, rgba(88,166,255,.06) 0%, rgba(163,113,247,.04) 100%);
+  border: 1px solid rgba(88,166,255,.25);
+  border-radius: 14px;
+  padding: 22px 26px;
+  margin-bottom: 24px;
+}
+.summary-icon {
+  width: 56px; height: 56px;
+  background: var(--bg-2);
+  border-radius: 14px;
+  display: grid; place-items: center;
+  color: var(--accent);
+}
+.summary-icon svg { width: 28px; height: 28px; }
+.summary-title {
+  font-size: 11px; color: var(--text-soft);
+  text-transform: uppercase; letter-spacing: .12em;
+  font-weight: 600; margin-bottom: 6px;
+}
+.summary-text {
+  font-size: 16px; line-height: 1.55;
+  color: var(--text); font-weight: 400;
+}
+
+/* Two-column layout: main + sticky map sidebar */
+.two-col {
+  display: grid;
+  grid-template-columns: 1fr 420px;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 1024px) {
+  .two-col { grid-template-columns: 1fr; }
+  .col-side .plot-card { position: static !important; }
+}
+.col-main { min-width: 0; }
+.col-side { min-width: 0; }
 </style>
 """
 
@@ -324,11 +367,11 @@ COMPARE_HTML = (BASE_CSS + """
 
 INDEX_HTML = (BASE_CSS + """
 <nav class="nav"><div class="nav-inner">
-  <div class="brand">
+  <a href="/" class="brand" style="text-decoration:none;color:inherit">
     <div class="brand-mark">""" + LOGO_SVG + """</div>
     <span>Kokpit</span>
     <span class="brand-sub">Mission Replay</span>
-  </div>
+  </a>
   <div class="nav-meta">
     <span>{{ runs|length }} run{{ '' if runs|length==1 else 's' }}</span>
     <span>·</span>
@@ -339,6 +382,58 @@ INDEX_HTML = (BASE_CSS + """
 <div class="wrap">
   <h1 class="page-title">Mission archive</h1>
   <p class="page-sub">Otonom teslimat görev kayıtları — events, telemetry ve plot.</p>
+
+  <!-- Hero stats (top) -->
+  <div class="hero-stats">
+    <div class="hero-stat">
+      <div class="hero-num" id="s-total">—</div>
+      <div class="hero-lbl">Toplam görev</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-num ok" id="s-deliv">—</div>
+      <div class="hero-lbl">Başarılı teslimat</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-num err" id="s-abort">—</div>
+      <div class="hero-lbl">İptal edilen</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-num accent" id="s-rate">—</div>
+      <div class="hero-lbl">Başarı oranı</div>
+    </div>
+    <div class="hero-stat">
+      <div class="hero-num" id="s-fly">—</div>
+      <div class="hero-lbl">Toplam uçuş</div>
+    </div>
+  </div>
+  <style>
+    .hero-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .hero-stat {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 22px;
+      transition: border-color .15s ease;
+    }
+    .hero-stat:hover { border-color: var(--border-strong); }
+    .hero-num {
+      font-size: 32px; font-weight: 700; letter-spacing: -0.025em;
+      font-family: 'JetBrains Mono', monospace;
+      line-height: 1.1;
+    }
+    .hero-num.ok { color: var(--ok); }
+    .hero-num.err { color: var(--err); }
+    .hero-num.accent { color: var(--accent); }
+    .hero-lbl {
+      color: var(--text-soft); font-size: 12px;
+      margin-top: 6px;
+    }
+  </style>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center">
     <input id="search" type="search" placeholder="Search runs…" autocomplete="off"
@@ -369,15 +464,6 @@ INDEX_HTML = (BASE_CSS + """
     <iframe src="{{ live_url }}" style="width:100%;height:480px;border:0;background:var(--bg-2)"></iframe>
   </div>
   {% endif %}
-
-  <div class="section-label" style="margin-top:36px">All-time stats</div>
-  <div class="stats" id="stats-block" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-    <div class="stat"><div class="stat-label">Total runs</div><div class="stat-value mono" id="s-total">—</div></div>
-    <div class="stat"><div class="stat-label">Delivered</div><div class="stat-value mono" id="s-deliv">—</div></div>
-    <div class="stat"><div class="stat-label">Aborted</div><div class="stat-value mono" id="s-abort">—</div></div>
-    <div class="stat"><div class="stat-label">Success rate</div><div class="stat-value mono" id="s-rate">—</div></div>
-    <div class="stat"><div class="stat-label">Total flight</div><div class="stat-value mono" id="s-fly">—</div></div>
-  </div>
 </div>
 
 <script>
@@ -449,11 +535,11 @@ setInterval(refresh, 5000);
 
 RUN_HTML = (BASE_CSS + """
 <nav class="nav"><div class="nav-inner">
-  <div class="brand">
+  <a href="/" class="brand" style="text-decoration:none;color:inherit">
     <div class="brand-mark">""" + LOGO_SVG + """</div>
     <span>Kokpit</span>
     <span class="brand-sub">Mission Replay</span>
-  </div>
+  </a>
   <div class="nav-meta"><span>Teknofest 2026</span></div>
 </div></nav>
 
@@ -491,53 +577,87 @@ RUN_HTML = (BASE_CSS + """
 })();
 </script>
 
-  <div class="stats">
+  <!-- Friendly summary (en üstte, herkes okuyabilir) -->
+  <div class="summary-card">
+    <div class="summary-icon">
+      {% if delivered %}""" + ICON["package"] + """
+      {% elif abort_reason %}""" + ICON["octagon_x"] + """
+      {% else %}""" + ICON["alert"] + """{% endif %}
+    </div>
+    <div>
+      <div class="summary-title">Görev özeti</div>
+      <div class="summary-text">{{ human_summary }}</div>
+    </div>
+  </div>
+
+  <div class="stats" style="grid-template-columns:repeat(4,1fr)">
     <div class="stat">
-      <div class="stat-label">""" + ICON["clock"] + """ Duration</div>
-      <div class="stat-value mono">{{ duration_s }}s</div>
+      <div class="stat-label">""" + ICON["clock"] + """ Süre</div>
+      <div class="stat-value mono">{{ '%d:%02d'|format(duration_s // 60, duration_s % 60) }}</div>
     </div>
     <div class="stat">
-      <div class="stat-label">""" + ICON["activity"] + """ Telemetry</div>
-      <div class="stat-value mono">{{ tel_rows }}</div>
+      <div class="stat-label">""" + ICON["plane_up"] + """ Max irtifa</div>
+      <div class="stat-value mono">{{ '%.0f'|format(tel_stats.max_alt or 0) }} m</div>
     </div>
     <div class="stat">
-      <div class="stat-label">""" + ICON["satellite"] + """ Events</div>
+      <div class="stat-label">""" + ICON["activity"] + """ Olay sayısı</div>
       <div class="stat-value mono">{{ events|length }}</div>
     </div>
-  </div>
-
-  <div class="section-label">Timeline</div>
-  <div class="timeline">
-    {% for e in events %}
-    <div class="event">
-      <div class="t">t+{{ '%02d'|format(e.dt // 60) }}:{{ '%02d'|format(e.dt % 60) }}</div>
-      <div class="ic {{ e.tone }}">{{ e.icon|safe }}</div>
-      <div>
-        <div class="name">{{ e.name }}</div>
-        {% if e.detail %}<div class="detail">{{ e.detail }}</div>{% endif %}
-      </div>
-      <div class="t">+{{ e.dt }}s</div>
+    <div class="stat">
+      <div class="stat-label">""" + ICON["satellite"] + """ Telemetry</div>
+      <div class="stat-value mono">{{ tel_rows }}</div>
     </div>
-    {% endfor %}
   </div>
 
-  {% if tel_rows > 0 %}
-  <div class="section-label">Flight path</div>
-  <div class="plot-card" style="padding:0">
-    <div id="map" style="height:380px;width:100%;background:var(--bg-2);border-radius:10px"></div>
+  <!-- 2-column layout: sol içerik | sağ harita (sticky) -->
+  <div class="two-col">
+    <div class="col-main">
+      <div class="section-label">Olay zaman çizelgesi</div>
+      <div class="timeline">
+        {% for e in events %}
+        <div class="event">
+          <div class="t">{{ '%d:%02d'|format(e.dt // 60, e.dt % 60) }}</div>
+          <div class="ic {{ e.tone }}">{{ e.icon|safe }}</div>
+          <div>
+            <div class="name">{{ e.label }}</div>
+            {% if e.detail %}<div class="detail">{{ e.detail }}</div>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+
+      {% if tel_rows > 0 %}
+      <div class="section-label">Görev aşamaları</div>
+      <div class="plot-card" style="padding:14px 18px">
+        <div style="color:var(--text-soft);font-size:12px;margin-bottom:8px">
+          Görevin hangi aşamada ne kadar zaman geçirdiği:
+        </div>
+        <div id="phases"></div>
+        <div id="phase-legend" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px;font-size:11px;color:var(--text-dim)"></div>
+      </div>
+
+      <div class="section-label">İrtifa ve batarya</div>
+      <div class="plot-card"><img src="/run/{{ name }}/plot.png" alt="plot"/></div>
+
+      <div class="section-label">Güvenlik uyarıları</div>
+      <div class="plot-card" id="failsafe-panel" style="padding:14px 18px;font-size:13px">Yükleniyor…</div>
+      {% endif %}
+    </div>
+
+    {% if tel_rows > 0 %}
+    <aside class="col-side">
+      <div class="section-label" style="margin-top:0">Uçuş rotası</div>
+      <div class="plot-card" style="padding:0;position:sticky;top:80px">
+        <div id="map" style="height:520px;width:100%;background:var(--bg-2);border-radius:10px"></div>
+        <div style="padding:10px 14px;font-size:11px;color:var(--text-soft);border-top:1px solid var(--border);display:flex;gap:14px">
+          <span><span style="display:inline-block;width:8px;height:8px;background:#3fb950;border-radius:50%;margin-right:5px"></span>Başlangıç</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:#d29922;border-radius:50%;margin-right:5px"></span>Bitiş</span>
+          <span><span style="display:inline-block;width:14px;height:2px;background:#58a6ff;vertical-align:middle;margin-right:5px"></span>Uçuş yolu</span>
+        </div>
+      </div>
+    </aside>
+    {% endif %}
   </div>
-
-  <div class="section-label">Phase timeline</div>
-  <div class="plot-card" style="padding:14px 18px">
-    <div id="phases" style="font-family:'JetBrains Mono',monospace;font-size:12px"></div>
-  </div>
-
-  <div class="section-label">Telemetry · altitude + battery</div>
-  <div class="plot-card"><img src="/run/{{ name }}/plot.png" alt="plot"/></div>
-
-  <div class="section-label">Failsafe events</div>
-  <div class="plot-card" id="failsafe-panel" style="padding:14px 18px;color:var(--text-soft);font-size:13px">Yükleniyor…</div>
-  {% endif %}
 </div>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
@@ -563,11 +683,11 @@ RUN_HTML = (BASE_CSS + """
       map.fitBounds(line.getBounds(), { padding: [20, 20] });
     } else {
       document.getElementById('map').innerHTML =
-        '<div style="padding:60px 20px;text-align:center;color:var(--text-soft);font-size:13px">Track verisi yok (GPS fix yokken kaydedilen run)</div>';
+        '<div style="padding:60px 20px;text-align:center;color:var(--text-soft);font-size:13px">Konum verisi yok (GPS sinyali olmadan kaydedilmiş)</div>';
     }
   } catch(e) { console.error(e); }
 
-  // Phase timeline
+  // Phase timeline (friendly Turkish labels)
   try {
     const r = await fetch(`/run/${name}/phases.json`);
     const data = await r.json();
@@ -579,34 +699,55 @@ RUN_HTML = (BASE_CSS + """
       DISARM: '#6b7689', MISSION_COMPLETE: '#3fb950', ABORT: '#f85149',
       FAILED: '#f85149', READ_ONLY: '#d29922',
     };
+    const labels_tr = {
+      IDLE: 'Beklemede', WAIT_PACKET: 'Paket bekleniyor', PREFLIGHT: 'Hazırlık',
+      TAKEOFF: 'Kalkış', NAVIGATE: 'Hedefe gidiş', SEARCH_MARKER: 'İşaret aranıyor',
+      PRECISION_APPROACH: 'Hassas yaklaşım', BIOMETRIC_VERIFY: 'Yüz doğrulama',
+      DROP_PACKAGE: 'Paket bırakma', RETURN_HOME: 'Eve dönüş',
+      LANDING: 'İniş', DISARM: 'Motor kapalı',
+      MISSION_COMPLETE: 'Tamamlandı', ABORT: 'İptal',
+      FAILED: 'Başarısız', READ_ONLY: 'Salt-okunur',
+    };
     if (!data.phases.length) {
       document.getElementById('phases').innerHTML =
-        '<span style="color:var(--text-soft)">Phase verisi yok</span>';
+        '<span style="color:var(--text-soft)">Aşama verisi yok</span>';
       return;
     }
     const total = Math.max(1, data.phases[data.phases.length-1].end);
-    let html = '<div style="display:flex;height:34px;border-radius:6px;overflow:hidden;border:1px solid var(--border)">';
+    let html = '<div style="display:flex;height:36px;border-radius:8px;overflow:hidden;border:1px solid var(--border)">';
+    const seen = new Set();
     data.phases.forEach(p => {
       const w = ((p.end - p.start) / total * 100).toFixed(2);
       const c = colors[p.state] || '#6b7689';
-      html += `<div title="${p.state} (${(p.end-p.start).toFixed(0)}s)" style="flex:0 0 ${w}%;background:${c};display:grid;place-items:center;font-size:10px;color:#0d1117;font-weight:600;overflow:hidden;white-space:nowrap;padding:0 4px">${w >= 6 ? p.state : ''}</div>`;
+      const lbl = labels_tr[p.state] || p.state;
+      const dur = (p.end-p.start).toFixed(0);
+      seen.add(p.state);
+      html += `<div title="${lbl} — ${dur} saniye" style="flex:0 0 ${w}%;background:${c};display:grid;place-items:center;font-size:11px;color:#0d1117;font-weight:600;overflow:hidden;white-space:nowrap;padding:0 6px;cursor:default">${w >= 10 ? lbl : ''}</div>`;
     });
     html += '</div>';
-    html += '<div style="display:flex;justify-content:space-between;margin-top:8px;color:var(--text-soft);font-size:11px"><span>0s</span><span>' + total.toFixed(0) + 's</span></div>';
+    html += '<div style="display:flex;justify-content:space-between;margin-top:8px;color:var(--text-soft);font-size:11px"><span>0:00</span><span>' + Math.floor(total/60) + ':' + String(Math.floor(total%60)).padStart(2,'0') + '</span></div>';
     document.getElementById('phases').innerHTML = html;
+    // Legend
+    let legend = '';
+    seen.forEach(st => {
+      const c = colors[st] || '#6b7689';
+      legend += `<span style="display:inline-flex;align-items:center;gap:5px"><span style="display:inline-block;width:10px;height:10px;background:${c};border-radius:2px"></span>${labels_tr[st] || st}</span>`;
+    });
+    document.getElementById('phase-legend').innerHTML = legend;
   } catch(e) { console.error(e); }
 
-  // Failsafe events
+  // Failsafe events (TR)
   try {
     const r = await fetch(`/run/${name}/failsafe.json`);
     const data = await r.json();
     const panel = document.getElementById('failsafe-panel');
     if (!data.events.length) {
-      panel.innerHTML = '<span style="color:var(--ok)">✓ Bu görevde failsafe tetiklenmedi</span>';
+      panel.innerHTML = '<div style="display:flex;align-items:center;gap:10px;color:var(--ok)"><span style="display:inline-block;width:8px;height:8px;background:var(--ok);border-radius:50%"></span>Bu görevde güvenlik uyarısı tetiklenmedi — her şey yolundaydı.</div>';
     } else {
-      let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+      let html = '<div style="display:flex;flex-direction:column;gap:8px">';
       data.events.forEach(e => {
-        html += `<div style="display:flex;gap:14px;font-family:'JetBrains Mono',monospace;font-size:12px"><span style="color:var(--err);font-weight:600">⚠ FAILSAFE</span><span>t+${e.t.toFixed(1)}s</span><span style="color:var(--text-soft)">${e.state}</span></div>`;
+        const t = `${Math.floor(e.t/60)}:${String(Math.floor(e.t%60)).padStart(2,'0')}`;
+        html += `<div style="display:flex;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--err);font-weight:600;font-size:12px">⚠ UYARI</span><span style="font-family:'JetBrains Mono',monospace;color:var(--text-soft);font-size:12px">${t}</span><span style="color:var(--text);font-size:13px">Aşama: ${e.state}</span></div>`;
       });
       html += '</div>';
       panel.innerHTML = html;
@@ -618,18 +759,94 @@ RUN_HTML = (BASE_CSS + """
 
 
 EVENT_MAP = {
-    "start":             ("play", "accent"),
-    "takeoff":           ("plane_up", "accent"),
-    "cruise":            ("plane", "accent"),
-    "marker_locked":     ("crosshair", "violet"),
-    "marker_lost":       ("alert", "err"),
-    "face_match":        ("user_check", "pink"),
-    "face_mismatch":     ("user_x", "err"),
-    "package_delivered": ("package", "ok"),
-    "rtl_complete":      ("home", "warn"),
-    "abort":             ("octagon_x", "err"),
-    "land":              ("arrow_down", "warn"),
+    "start":             ("play", "accent", "Görev başladı"),
+    "takeoff":           ("plane_up", "accent", "Drone havalandı"),
+    "cruise":            ("plane", "accent", "Hedefe gidiyor"),
+    "marker_locked":     ("crosshair", "violet", "Hedef işaret bulundu"),
+    "marker_lost":       ("alert", "err", "Hedef işaret kaybedildi"),
+    "face_match":        ("user_check", "pink", "Alıcı yüzü tanındı"),
+    "face_mismatch":     ("user_x", "err", "Yüz eşleşmedi"),
+    "package_delivered": ("package", "ok", "Paket teslim edildi"),
+    "rtl_complete":      ("home", "warn", "Eve döndü"),
+    "abort":             ("octagon_x", "err", "Görev iptal edildi"),
+    "land":              ("arrow_down", "warn", "İniş yapıyor"),
+    "phase":             ("dot", "", "Aşama değişti"),
+    "mission_end":       ("home", "warn", "Görev tamamlandı"),
 }
+
+
+def _human_summary(name: str, events: list, duration_s: int,
+                   delivered: bool, abort_reason: str,
+                   tel_stats: dict) -> str:
+    """Kısa, çocuk-anlayışlı Türkçe görev özeti üret."""
+    parts = []
+    if duration_s > 0:
+        m, s = divmod(duration_s, 60)
+        if m > 0:
+            parts.append(f"Görev {m} dakika {s} saniye sürdü.")
+        else:
+            parts.append(f"Görev {s} saniye sürdü.")
+    max_alt = tel_stats.get("max_alt")
+    if max_alt and max_alt > 1:
+        parts.append(f"Drone en fazla {max_alt:.0f} metre yüksekliğe çıktı.")
+    if any(e.get("event") == "marker_locked" for e in events):
+        parts.append("Yer işaretini buldu.")
+    face = next((e for e in events if e.get("event") == "face_match"), None)
+    if face:
+        conf = face.get("confidence")
+        if conf is not None:
+            parts.append(f"Alıcının yüzünü %{float(conf)*100:.0f} eşleşme ile tanıdı.")
+        else:
+            parts.append("Alıcının yüzünü tanıdı.")
+    if delivered:
+        parts.append("Paketi başarıyla teslim etti.")
+    elif abort_reason:
+        reasons_tr = {
+            "BATTERY_LOW": "batarya zayıf olduğu için",
+            "LINK_LOST": "iletişim koptuğu için",
+            "GPS_LOST": "GPS sinyali kaybolduğu için",
+            "MARKER_LOST": "hedef işaretini bulamadığı için",
+            "FACE_MISMATCH": "yüz eşleşmediği için",
+            "Yer istasyonu ABORT": "yer istasyonu durdurduğu için",
+        }
+        why = reasons_tr.get(abort_reason, abort_reason)
+        parts.append(f"Görev {why} iptal edildi.")
+    else:
+        parts.append("Görev tamamlanamadı.")
+    if any(e.get("event") == "rtl_complete" for e in events) or \
+       any(e.get("event") == "mission_end" for e in events):
+        parts.append("Drone üsse geri döndü.")
+    bat_drop = tel_stats.get("battery_drop")
+    if bat_drop and bat_drop > 0.05:
+        parts.append(f"Bataryanın {bat_drop:.1f} voltu harcandı.")
+    if not parts:
+        return "Bu görev hakkında özet üretilemedi."
+    return " ".join(parts)
+
+
+def _telemetry_stats(d: Path) -> dict:
+    """Min/max altitude + battery harcaması özeti."""
+    import csv
+    tel = d / "telemetry.csv"
+    if not tel.exists():
+        return {}
+    alts, bats = [], []
+    with tel.open() as f:
+        for row in csv.DictReader(f):
+            try:
+                alts.append(float(row["alt_rel"]))
+                bats.append(float(row["battery_v"]))
+            except Exception:
+                continue
+    out = {}
+    if alts:
+        out["max_alt"] = max(alts)
+        out["min_alt"] = min(alts)
+    if bats:
+        out["battery_start"] = bats[0]
+        out["battery_end"] = bats[-1]
+        out["battery_drop"] = bats[0] - bats[-1]
+    return out
 
 
 def _summarize_run(d: Path) -> dict:
@@ -684,6 +901,7 @@ def run_view(name):
         abort(404)
     summary = _summarize_run(d)
     events = []
+    raw_events = []
     ev_file = d / "events.jsonl"
     first_ts = None
     if ev_file.exists():
@@ -692,27 +910,40 @@ def run_view(name):
                 j = json.loads(ln)
             except Exception:
                 continue
+            raw_events.append(j)
             t = j.get("ts") or j.get("timestamp") or 0
             if first_ts is None:
                 first_ts = t
             ev_name = j.get("event", "?")
-            ic_key, tone = EVENT_MAP.get(ev_name, ("dot", ""))
+            ic_key, tone, label_tr = EVENT_MAP.get(
+                ev_name, ("dot", "", ev_name))
             extras = {k: v for k, v in j.items()
                       if k not in ("ts", "timestamp", "event")}
-            detail = " · ".join(f"{k}={v}" for k, v in extras.items())
+            # phase event: state field önemli
+            if ev_name == "phase":
+                detail = extras.get("state", "")
+                label_tr = f"Aşama: {extras.get('state', '')}"
+            else:
+                detail = " · ".join(f"{k}={v}" for k, v in extras.items())
             events.append({
                 "dt": int(t - first_ts),
                 "icon": ICON.get(ic_key, ICON["dot"]),
                 "tone": tone,
+                "label": label_tr,
                 "name": ev_name,
                 "detail": detail,
             })
     tel = d / "telemetry.csv"
     tel_rows = max(0, len(tel.read_text().splitlines()) - 1) if tel.exists() else 0
+    tel_stats = _telemetry_stats(d)
+    human = _human_summary(safe, raw_events, summary["duration_s"],
+                           summary["delivered"], summary["abort_reason"],
+                           tel_stats)
     return render_template_string(
         RUN_HTML, name=safe, events=events, tel_rows=tel_rows,
         duration_s=summary["duration_s"], delivered=summary["delivered"],
         abort_reason=summary["abort_reason"],
+        human_summary=human, tel_stats=tel_stats,
     )
 
 
