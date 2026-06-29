@@ -116,6 +116,12 @@ class Mission:
                 self._run_dir = _evl.make_run_dir()
                 self._event_logger = _evl.EventLogger(
                     self._run_dir / "events.jsonl")
+                # #13 — opsiyonel webhook (KOKPIT_WEBHOOK_URL env)
+                try:
+                    import webhook_alerter
+                    webhook_alerter.attach_to_event_logger(self._event_logger)
+                except Exception:
+                    pass
                 _evl.set_global(self._event_logger)
                 self._event_logger.emit("start", sim=CFG.simulation,
                                         sysid=CFG.link.target_sysid)
