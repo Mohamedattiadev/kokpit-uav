@@ -290,6 +290,38 @@ a.link:hover { text-decoration: underline; }
 
 LOGO_SVG = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 9.5 8 10 4.5-.5 8-5 8-10V6z"/></svg>'
 
+COMPARE_HTML = (BASE_CSS + """
+<nav class="nav"><div class="nav-inner">
+  <div class="brand"><div class="brand-mark">""" + LOGO_SVG + """</div>
+    <span>Kokpit</span><span class="brand-sub">Run comparison</span></div>
+  <div class="nav-meta"><a class="back" href="/">""" + ICON["arrow_left"] + """ All runs</a></div>
+</div></nav>
+<div class="wrap">
+  <h1 class="page-title">Compare</h1>
+  <p class="page-sub mono">{{ a.name }} <span style="color:var(--text-soft)">vs</span> {{ b.name }}</p>
+  <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+    <div class="stat"><div class="stat-label">Duration A</div><div class="stat-value mono">{{ a.duration_s }}s</div></div>
+    <div class="stat"><div class="stat-label">Duration B</div><div class="stat-value mono">{{ b.duration_s }}s</div></div>
+    <div class="stat"><div class="stat-label">Telemetry A</div><div class="stat-value mono">{{ a.telemetry_rows }}</div></div>
+    <div class="stat"><div class="stat-label">Telemetry B</div><div class="stat-value mono">{{ b.telemetry_rows }}</div></div>
+    <div class="stat"><div class="stat-label">Status A</div><div class="stat-value">{% if a.delivered %}<span style="color:var(--ok)">✓ delivered</span>{% elif a.abort_reason %}<span style="color:var(--err)">⚠ {{ a.abort_reason }}</span>{% else %}<span style="color:var(--warn)">—</span>{% endif %}</div></div>
+    <div class="stat"><div class="stat-label">Status B</div><div class="stat-value">{% if b.delivered %}<span style="color:var(--ok)">✓ delivered</span>{% elif b.abort_reason %}<span style="color:var(--err)">⚠ {{ b.abort_reason }}</span>{% else %}<span style="color:var(--warn)">—</span>{% endif %}</div></div>
+    <div class="stat"><div class="stat-label">Δ Duration</div><div class="stat-value mono">{{ b.duration_s - a.duration_s }}s</div></div>
+    <div class="stat"><div class="stat-label">Δ Telemetry</div><div class="stat-value mono">{{ b.telemetry_rows - a.telemetry_rows }}</div></div>
+  </div>
+  <div class="section-label">Plots</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+    <div class="plot-card"><img src="/run/{{ a.name }}/plot.png" alt="A"/></div>
+    <div class="plot-card"><img src="/run/{{ b.name }}/plot.png" alt="B"/></div>
+  </div>
+  <div class="section-label" style="margin-top:24px">Quick links</div>
+  <div style="display:flex;gap:12px">
+    <a class="link" href="/run/{{ a.name }}">View {{ a.name }} →</a>
+    <a class="link" href="/run/{{ b.name }}">View {{ b.name }} →</a>
+  </div>
+</div>
+""")
+
 INDEX_HTML = (BASE_CSS + """
 <nav class="nav"><div class="nav-inner">
   <div class="brand">
@@ -329,6 +361,15 @@ INDEX_HTML = (BASE_CSS + """
   <div id="empty-state" style="display:none" class="empty">
   """ + ICON["satellite"] + """
   <p>Eşleşen kayıt yok.</p>
+  </div>
+
+  <div class="section-label" style="margin-top:36px">All-time stats</div>
+  <div class="stats" id="stats-block" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+    <div class="stat"><div class="stat-label">Total runs</div><div class="stat-value mono" id="s-total">—</div></div>
+    <div class="stat"><div class="stat-label">Delivered</div><div class="stat-value mono" id="s-deliv">—</div></div>
+    <div class="stat"><div class="stat-label">Aborted</div><div class="stat-value mono" id="s-abort">—</div></div>
+    <div class="stat"><div class="stat-label">Success rate</div><div class="stat-value mono" id="s-rate">—</div></div>
+    <div class="stat"><div class="stat-label">Total flight</div><div class="stat-value mono" id="s-fly">—</div></div>
   </div>
 </div>
 
@@ -385,6 +426,13 @@ async function refresh() {
     const data = await r.json();
     _runs = data.runs || [];
     render();
+    const s = await (await fetch('/api/stats')).json();
+    document.getElementById('s-total').textContent = s.total_runs;
+    document.getElementById('s-deliv').textContent = s.delivered;
+    document.getElementById('s-abort').textContent = s.aborted;
+    document.getElementById('s-rate').textContent = s.success_rate_pct + '%';
+    const m = Math.floor(s.total_flight_s / 60), sec = s.total_flight_s % 60;
+    document.getElementById('s-fly').textContent = `${m}m ${sec}s`;
   } catch(e) {}
 }
 refresh();
@@ -409,12 +457,32 @@ RUN_HTML = (BASE_CSS + """
       <h1 class="run-title">{{ name }}</h1>
       <div class="run-sub">{{ events|length }} events · {{ tel_rows }} telemetry rows</div>
     </div>
-    <div>
+    <div style="display:flex;gap:8px;align-items:center">
       {% if delivered %}<span class="chip ok">""" + ICON["package"] + """ delivered</span>
       {% elif abort_reason %}<span class="chip err">""" + ICON["octagon_x"] + """ {{ abort_reason }}</span>
       {% else %}<span class="chip warn">incomplete</span>{% endif %}
+      <a href="/run/{{ name }}/download.zip" class="chip" style="text-decoration:none">⬇ Download</a>
+      <select id="compare-pick" style="background:var(--bg-1);border:1px solid var(--border);color:var(--text-dim);padding:5px 8px;border-radius:5px;font-size:11px;font-family:'JetBrains Mono',monospace">
+        <option value="">Compare with…</option>
+      </select>
     </div>
   </div>
+<script>
+(async function() {
+  const me = {{ name|tojson }};
+  const r = await fetch('/api/runs');
+  const data = await r.json();
+  const sel = document.getElementById('compare-pick');
+  data.runs.filter(x => x.name !== me).forEach(x => {
+    const opt = document.createElement('option');
+    opt.value = x.name; opt.textContent = x.name;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', e => {
+    if (e.target.value) location.href = `/compare?a=${me}&b=${encodeURIComponent(e.target.value)}`;
+  });
+})();
+</script>
 
   <div class="stats">
     <div class="stat">
@@ -790,6 +858,63 @@ def run_failsafe(name):
 @app.route("/api/runs")
 def api_runs():
     return jsonify({"runs": _list_runs()})
+
+
+@app.route("/api/stats")
+def api_stats():
+    runs = _list_runs()
+    delivered = sum(1 for r in runs if r["delivered"])
+    aborted = sum(1 for r in runs if r["abort_reason"])
+    total_s = sum(r["duration_s"] for r in runs)
+    rate = (100.0 * delivered / len(runs)) if runs else 0.0
+    return jsonify({
+        "total_runs": len(runs),
+        "delivered": delivered,
+        "aborted": aborted,
+        "total_flight_s": total_s,
+        "success_rate_pct": round(rate, 1),
+    })
+
+
+@app.route("/run/<name>/download.zip")
+def run_download(name):
+    import io
+    import zipfile
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    d = RUNS_DIR / safe
+    if not d.exists():
+        abort(404)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for fname in ("events.jsonl", "telemetry.csv"):
+            p = d / fname
+            if p.exists():
+                z.writestr(f"{safe}/{fname}", p.read_bytes())
+    buf.seek(0)
+    from flask import Response
+    return Response(buf.read(), mimetype="application/zip", headers={
+        "Content-Disposition": f"attachment; filename={safe}.zip",
+    })
+
+
+@app.route("/compare")
+def compare():
+    from flask import request as freq
+    a = freq.args.get("a", "")
+    b = freq.args.get("b", "")
+    sa = "".join(c for c in a if c.isalnum() or c in "-_.")
+    sb = "".join(c for c in b if c.isalnum() or c in "-_.")
+    if not sa or not sb or sa != a or sb != b:
+        abort(400)
+    da = RUNS_DIR / sa
+    db = RUNS_DIR / sb
+    if not da.exists() or not db.exists():
+        abort(404)
+    summary_a = _summarize_run(da)
+    summary_b = _summarize_run(db)
+    return render_template_string(COMPARE_HTML, a=summary_a, b=summary_b)
 
 
 @app.route("/run/<name>/events.json")
