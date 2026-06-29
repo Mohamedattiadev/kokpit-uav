@@ -434,9 +434,14 @@ INDEX_HTML = (BASE_CSS + """
     <span class="brand-sub">Mission Replay</span>
   </a>
   <div class="nav-meta">
-    <div class="lang-switch">
-      <a href="?lang=tr" class="{{ 'active' if lang == 'tr' else '' }}">TR</a>
-      <a href="?lang=en" class="{{ 'active' if lang == 'en' else '' }}">EN</a>
+    <div style="display:inline-flex;background:#131922;border:1px solid #1f2733;border-radius:7px;padding:2px;gap:2px">
+      {% if lang == 'tr' %}
+      <a href="?lang=tr" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#0d1117;background:#58a6ff;border-radius:5px;text-decoration:none;box-shadow:0 1px 2px rgba(88,166,255,.3)">TR</a>
+      <a href="?lang=en" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#9aa5b8;background:transparent;border-radius:5px;text-decoration:none">EN</a>
+      {% else %}
+      <a href="?lang=tr" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#9aa5b8;background:transparent;border-radius:5px;text-decoration:none">TR</a>
+      <a href="?lang=en" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#0d1117;background:#58a6ff;border-radius:5px;text-decoration:none;box-shadow:0 1px 2px rgba(88,166,255,.3)">EN</a>
+      {% endif %}
     </div>
     <span class="nav-brand-chip">Teknofest 2026</span>
   </div>
@@ -982,9 +987,14 @@ RUN_HTML = (BASE_CSS + """
     <span class="brand-sub">Mission Replay</span>
   </a>
   <div class="nav-meta">
-    <div class="lang-switch">
-      <a href="?lang=tr" class="{{ 'active' if lang == 'tr' else '' }}">TR</a>
-      <a href="?lang=en" class="{{ 'active' if lang == 'en' else '' }}">EN</a>
+    <div style="display:inline-flex;background:#131922;border:1px solid #1f2733;border-radius:7px;padding:2px;gap:2px">
+      {% if lang == 'tr' %}
+      <a href="?lang=tr" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#0d1117;background:#58a6ff;border-radius:5px;text-decoration:none;box-shadow:0 1px 2px rgba(88,166,255,.3)">TR</a>
+      <a href="?lang=en" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#9aa5b8;background:transparent;border-radius:5px;text-decoration:none">EN</a>
+      {% else %}
+      <a href="?lang=tr" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#9aa5b8;background:transparent;border-radius:5px;text-decoration:none">TR</a>
+      <a href="?lang=en" style="padding:5px 12px;font:700 11px Inter,sans-serif;letter-spacing:.05em;color:#0d1117;background:#58a6ff;border-radius:5px;text-decoration:none;box-shadow:0 1px 2px rgba(88,166,255,.3)">EN</a>
+      {% endif %}
     </div>
     <span class="nav-brand-chip">Teknofest 2026</span>
   </div>
