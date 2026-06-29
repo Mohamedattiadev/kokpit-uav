@@ -1,0 +1,11 @@
+<?xml version="1.0" ?>
+<sdf version="1.9">
+  <model name="marker_pad">
+    <static>true</static>
+    <link name="link">
+      <visual name="v"><geometry><box><size>1 1 0.05</size></box></geometry>
+        <material><ambient>1 1 1 1</ambient></material></visual>
+      <collision name="c"><geometry><box><size>1 1 0.05</size></box></geometry></collision>
+    </link>
+  </model>
+</sdf>
