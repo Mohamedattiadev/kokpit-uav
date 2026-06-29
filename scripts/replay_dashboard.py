@@ -55,6 +55,25 @@ ICON = {
                       '<path d="m8 12 4 4"/><path d="m16 8-4 4"/>'
                       '<path d="m6 16 1.5 1.5"/><path d="M18 21a3 3 0 0 1-3-3"/>'),
     "clock": _svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
+    "file_text": _svg(
+        '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>'
+        '<polyline points="14 2 14 8 20 8"/>'
+        '<line x1="8" y1="13" x2="16" y2="13"/>'
+        '<line x1="8" y1="17" x2="13" y2="17"/>'),
+    "download": _svg(
+        '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>'
+        '<polyline points="7 10 12 15 17 10"/>'
+        '<line x1="12" y1="15" x2="12" y2="3"/>'),
+    "compare": _svg(
+        '<path d="m17 3 4 4-4 4"/><path d="M3 7h18"/>'
+        '<path d="m7 21-4-4 4-4"/><path d="M21 17H3"/>'),
+    "check_circle": _svg(
+        '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>'
+        '<polyline points="22 4 12 14.01 9 11.01"/>'),
+    "alert_triangle": _svg(
+        '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>'
+        '<line x1="12" y1="9" x2="12" y2="13"/>'
+        '<line x1="12" y1="17" x2="12.01" y2="17"/>'),
 }
 
 
@@ -372,38 +391,45 @@ INDEX_HTML = (BASE_CSS + """
     <span>Kokpit</span>
     <span class="brand-sub">Mission Replay</span>
   </a>
-  <div class="nav-meta">
-    <span>{{ runs|length }} run{{ '' if runs|length==1 else 's' }}</span>
+  <div class="nav-meta" style="display:flex;gap:16px;align-items:center">
+    <span><span id="nav-count">{{ runs|length }}</span> {{ i18n.runs_word }}</span>
     <span>·</span>
+    <span><span style="display:inline-block;width:6px;height:6px;background:#3fb950;border-radius:50%;margin-right:5px;animation:pulse 1.6s infinite"></span>{{ i18n.live }}</span>
+    <span>·</span>
+    <div class="lang-switch">
+      <a href="?lang=tr" class="{{ 'active' if lang == 'tr' else '' }}">TR</a>
+      <a href="?lang=en" class="{{ 'active' if lang == 'en' else '' }}">EN</a>
+    </div>
     <span>Teknofest 2026</span>
   </div>
 </div></nav>
+<style>@keyframes pulse {0%,100%{opacity:1}50%{opacity:.3}}</style>
 
 <div class="wrap">
-  <h1 class="page-title">Mission archive</h1>
-  <p class="page-sub">Otonom teslimat görev kayıtları — events, telemetry ve plot.</p>
+  <h1 class="page-title">{{ i18n.title }}</h1>
+  <p class="page-sub">{{ i18n.sub }}</p>
 
   <!-- Hero stats (top) -->
   <div class="hero-stats">
     <div class="hero-stat">
       <div class="hero-num" id="s-total">—</div>
-      <div class="hero-lbl">Toplam görev</div>
+      <div class="hero-lbl">{{ i18n.total_runs }}</div>
     </div>
     <div class="hero-stat">
       <div class="hero-num ok" id="s-deliv">—</div>
-      <div class="hero-lbl">Başarılı teslimat</div>
+      <div class="hero-lbl">{{ i18n.delivered }}</div>
     </div>
     <div class="hero-stat">
       <div class="hero-num err" id="s-abort">—</div>
-      <div class="hero-lbl">İptal edilen</div>
+      <div class="hero-lbl">{{ i18n.aborted }}</div>
     </div>
     <div class="hero-stat">
       <div class="hero-num accent" id="s-rate">—</div>
-      <div class="hero-lbl">Başarı oranı</div>
+      <div class="hero-lbl">{{ i18n.success_rate }}</div>
     </div>
     <div class="hero-stat">
       <div class="hero-num" id="s-fly">—</div>
-      <div class="hero-lbl">Toplam uçuş</div>
+      <div class="hero-lbl">{{ i18n.total_flight }}</div>
     </div>
   </div>
   <style>
@@ -436,15 +462,15 @@ INDEX_HTML = (BASE_CSS + """
   </style>
 
   <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center">
-    <input id="search" type="search" placeholder="Search runs…" autocomplete="off"
+    <input id="search" type="search" placeholder="{{ i18n.search }}" autocomplete="off"
       style="background:var(--bg-1);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;min-width:240px;font-family:'JetBrains Mono',monospace"/>
     <div id="filters" style="display:flex;gap:6px">
-      <button class="filter-btn active" data-f="all">All</button>
-      <button class="filter-btn" data-f="delivered">Delivered</button>
-      <button class="filter-btn" data-f="abort">Aborted</button>
-      <button class="filter-btn" data-f="incomplete">Incomplete</button>
+      <button class="filter-btn active" data-f="all">{{ i18n.all }}</button>
+      <button class="filter-btn" data-f="delivered">{{ i18n.f_deliv }}</button>
+      <button class="filter-btn" data-f="abort">{{ i18n.f_abort }}</button>
+      <button class="filter-btn" data-f="incomplete">{{ i18n.f_inc }}</button>
     </div>
-    <div style="margin-left:auto;color:var(--text-soft);font-size:11px"><span id="run-count">{{ runs|length }}</span> runs · live</div>
+    <div style="margin-left:auto;color:var(--text-soft);font-size:11px"><span id="run-count">{{ runs|length }}</span> {{ i18n.runs_word }}</div>
   </div>
   <style>
     .filter-btn { background:var(--bg-1);border:1px solid var(--border);color:var(--text-dim);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;font-family:inherit }
@@ -455,11 +481,11 @@ INDEX_HTML = (BASE_CSS + """
   <div id="runs-grid" class="grid"></div>
   <div id="empty-state" style="display:none" class="empty">
   """ + ICON["satellite"] + """
-  <p>Eşleşen kayıt yok.</p>
+  <p>{{ i18n.empty }}</p>
   </div>
 
   {% if live_url %}
-  <div class="section-label" style="margin-top:36px">Live mission feed</div>
+  <div class="section-label" style="margin-top:36px">{{ i18n.live_section }}</div>
   <div class="plot-card" style="padding:0;overflow:hidden">
     <iframe src="{{ live_url }}" style="width:100%;height:480px;border:0;background:var(--bg-2)"></iframe>
   </div>
@@ -467,17 +493,23 @@ INDEX_HTML = (BASE_CSS + """
 </div>
 
 <script>
+const LANG = {{ lang|tojson }};
+const T = {
+  delivered: LANG === 'en' ? 'delivered' : 'teslim edildi',
+  incomplete: LANG === 'en' ? 'incomplete' : 'tamamlanmadı',
+  mission: LANG === 'en' ? 'mission' : 'görev',
+};
 let _filter = 'all', _query = '', _runs = [];
 const card = r => {
   const cls = r.delivered ? 'ok' : (r.abort_reason ? 'err' : 'warn');
   const chip = r.delivered
-    ? '<span class="chip ok">""" + ICON["package"] + """ delivered</span>'
+    ? `<span class="chip ok">""" + ICON["package"] + """ ${T.delivered}</span>`
     : r.abort_reason
     ? `<span class="chip err">""" + ICON["octagon_x"] + """ ${r.abort_reason}</span>`
-    : '<span class="chip warn">incomplete</span>';
-  return `<a class="card ${cls}" href="/run/${r.name}">
+    : `<span class="chip warn">${T.incomplete}</span>`;
+  return `<a class="card ${cls}" href="/run/${r.name}?lang=${LANG}">
     <h3>${r.name}</h3>
-    <div class="card-meta">${r.duration_s}s mission</div>
+    <div class="card-meta">${r.duration_s}s ${T.mission}</div>
     <div class="card-row">
       <div class="card-stats">
         <span>""" + ICON["clock"] + """ ${r.duration_s}s</span>
@@ -526,6 +558,7 @@ async function refresh() {
     document.getElementById('s-rate').textContent = s.success_rate_pct + '%';
     const m = Math.floor(s.total_flight_s / 60), sec = s.total_flight_s % 60;
     document.getElementById('s-fly').textContent = `${m}m ${sec}s`;
+    const nc = document.getElementById('nav-count'); if (nc) nc.textContent = s.total_runs;
   } catch(e) {}
 }
 refresh();
@@ -832,17 +865,21 @@ RUN_HTML = (BASE_CSS + """
         <p class="hero-desc">{{ human_summary }}</p>
       </div>
       <div class="hero-actions">
-        <a href="/run/{{ name }}/download.zip" class="btn">""" + ICON["arrow_down"] + """ {{ i18n.download }}</a>
-        <a href="/run/{{ name }}/report.html" class="btn" target="_blank">📄 {{ i18n.report }}</a>
-        <select id="compare-pick" class="btn" style="appearance:none;padding-right:24px">
-          <option value="">⇄ {{ i18n.compare }}</option>
-        </select>
+        <a href="/run/{{ name }}/download.zip" class="btn">""" + ICON["download"] + """ {{ i18n.download }}</a>
+        <a href="/run/{{ name }}/report.html?lang={{ lang }}" class="btn" target="_blank">""" + ICON["file_text"] + """ {{ i18n.report }}</a>
+        <div style="position:relative">
+          <span style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--text-soft)">""" + ICON["compare"] + """</span>
+          <select id="compare-pick" class="btn" style="appearance:none;padding-left:34px;padding-right:24px">
+            <option value="">{{ i18n.compare }}</option>
+          </select>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- Phase stepper (fit, no scroll) -->
-  <div class="stepper" id="stepper" data-flow="{{ i18n.stepper|tojson|safe }}">Yükleniyor…</div>
+  <div class="stepper" id="stepper">…</div>
+  <script>window.MISSION_FLOW = {{ i18n.stepper|tojson }};</script>
 
   <!-- KPI cards -->
   <div class="kpis">
@@ -1091,10 +1128,10 @@ const LANG = {{ lang|tojson }};
     }
   } catch(e) {}
 
-  // Phase stepper (i18n labels from data-flow)
+  // Phase stepper (i18n labels from window.MISSION_FLOW)
   try {
     const step = document.getElementById('stepper');
-    const FLOW = JSON.parse(step.dataset.flow);  // [[state, label]…]
+    const FLOW = window.MISSION_FLOW;  // [[state, label], …]
     const r = await fetch(`/run/${name}/phases.json`);
     const data = await r.json();
     const visited = new Set(data.phases.map(p => p.state));
@@ -1306,8 +1343,33 @@ def _list_runs(runs_dir: Optional[Path] = None) -> list[dict]:
 
 @app.route("/")
 def index():
+    from flask import request as freq
+    lang = freq.args.get("lang", "tr")
+    if lang not in ("tr", "en"):
+        lang = "tr"
     live_url = os.environ.get("KOKPIT_LIVE_URL", "")
-    return render_template_string(INDEX_HTML, runs=_list_runs(), live_url=live_url)
+    tr = lang == "tr"
+    i18n = {
+        "title": "Görev arşivi" if tr else "Mission archive",
+        "sub": "Otonom teslimat görev kayıtları — olaylar, telemetri ve haritalar."
+               if tr else "Autonomous delivery mission records — events, telemetry, maps.",
+        "total_runs": "Toplam görev" if tr else "Total missions",
+        "delivered": "Başarılı teslimat" if tr else "Delivered",
+        "aborted": "İptal edilen" if tr else "Aborted",
+        "success_rate": "Başarı oranı" if tr else "Success rate",
+        "total_flight": "Toplam uçuş" if tr else "Total flight",
+        "search": "Görev ara…" if tr else "Search missions…",
+        "all": "Tümü" if tr else "All",
+        "f_deliv": "Başarılı" if tr else "Delivered",
+        "f_abort": "İptal" if tr else "Aborted",
+        "f_inc": "Tamamlanmamış" if tr else "Incomplete",
+        "live": "live" if tr else "live",
+        "runs_word": "görev" if tr else "missions",
+        "empty": "Eşleşen kayıt yok." if tr else "No matching missions.",
+        "live_section": "Canlı görev görüntüsü" if tr else "Live mission feed",
+    }
+    return render_template_string(INDEX_HTML, runs=_list_runs(),
+                                  live_url=live_url, lang=lang, i18n=i18n)
 
 
 @app.route("/run/<name>")
@@ -1594,6 +1656,8 @@ def api_stats():
 
 @app.route("/run/<name>/report.md")
 def run_report_md(name):
+    from flask import request as freq
+    lang = freq.args.get("lang", "tr")
     safe = "".join(c for c in name if c.isalnum() or c in "-_.")
     if safe != name:
         abort(400)
@@ -1603,7 +1667,7 @@ def run_report_md(name):
     sys.path.insert(0, str(ROOT / "scripts"))
     from make_report import build_report_md
     from flask import Response
-    return Response(build_report_md(d), mimetype="text/markdown")
+    return Response(build_report_md(d, lang=lang), mimetype="text/markdown")
 
 
 def _md_to_html(md: str) -> str:
@@ -1645,42 +1709,85 @@ def _md_to_html(md: str) -> str:
 
 REPORT_HTML_CSS = """
 <style>
-:root { color-scheme: dark; }
+:root { color-scheme: light; }
 body {
-  background: #0d1117; color: #e6edf3;
-  font: 15px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
-  max-width: 780px; margin: 40px auto; padding: 0 24px 60px;
+  background: #f7f8fa; color: #1a212d;
+  font: 15px/1.65 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  margin: 0; padding: 0; -webkit-font-smoothing: antialiased;
 }
-h1 { font-size: 28px; margin: 0 0 8px; letter-spacing: -0.02em; }
-h2 { font-size: 18px; margin: 32px 0 12px; padding-bottom: 8px;
-     border-bottom: 1px solid #1f2733; color: #58a6ff;
-     text-transform: uppercase; letter-spacing: .08em; }
-li { margin: 4px 0; }
-b { color: #58a6ff; font-weight: 600; }
-code { background: #1a212d; padding: 2px 6px; border-radius: 4px;
-       font: 13px ui-monospace, monospace; }
+.page {
+  max-width: 780px; margin: 32px auto; padding: 48px 56px;
+  background: white;
+  border: 1px solid #e3e7ec;
+  border-radius: 12px;
+  box-shadow: 0 2px 24px rgba(0,0,0,.06);
+}
+.title-bar {
+  border-bottom: 3px solid #2563eb;
+  padding-bottom: 18px; margin-bottom: 28px;
+  display: flex; justify-content: space-between; align-items: flex-end;
+}
+.brand-tag {
+  display: inline-flex; align-items: center; gap: 8px;
+  font: 600 13px ui-monospace, monospace;
+  color: #2563eb;
+}
+.brand-tag::before {
+  content: ""; display: inline-block;
+  width: 14px; height: 14px; border-radius: 4px;
+  background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+}
+.report-date { font-size: 12px; color: #6b7280; }
+h1 { font-size: 26px; margin: 0 0 16px; letter-spacing: -0.02em; font-weight: 700; }
+h2 {
+  font-size: 13px; margin: 32px 0 14px;
+  text-transform: uppercase; letter-spacing: .1em;
+  color: #2563eb; font-weight: 700;
+}
+h2::after {
+  content: ""; display: block; height: 1px;
+  background: linear-gradient(to right, #cdd5e0, transparent);
+  margin-top: 6px;
+}
+li { margin: 6px 0; }
+b { color: #1a212d; font-weight: 600; }
+code { background: #eef2f7; padding: 2px 6px; border-radius: 4px;
+       font: 13px ui-monospace, monospace; color: #1a212d; }
+p { margin: 8px 0; }
 table {
   width: 100%; border-collapse: collapse;
-  background: #131922; border: 1px solid #1f2733;
-  border-radius: 8px; overflow: hidden; margin: 14px 0;
+  margin: 14px 0; border: 1px solid #e3e7ec; border-radius: 8px;
+  overflow: hidden; font-size: 13px;
 }
-th, td { padding: 10px 14px; text-align: left; }
-th { background: #1a212d; font-size: 12px; text-transform: uppercase;
-     letter-spacing: .08em; color: #9aa5b8; }
-td { border-top: 1px solid #1f2733; font-size: 13px; }
-.print-btn {
-  position: fixed; top: 20px; right: 24px;
-  background: #58a6ff; color: #0d1117; border: 0;
+th, td { padding: 10px 14px; text-align: left; vertical-align: top; }
+th { background: #f3f5f8; font-size: 11px; text-transform: uppercase;
+     letter-spacing: .08em; color: #6b7280; font-weight: 600; }
+td { border-top: 1px solid #eef2f7; }
+tbody tr:hover { background: #fafbfc; }
+.lang-bar {
+  position: fixed; top: 20px; right: 24px; display: flex; gap: 8px;
+}
+.lang-bar a, .lang-bar button {
+  background: #2563eb; color: white; border: 0;
   padding: 8px 14px; border-radius: 8px;
   font: 600 13px inherit; cursor: pointer;
-  text-decoration: none;
+  text-decoration: none; box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.lang-bar a.alt { background: white; color: #2563eb; border: 1px solid #cdd5e0; }
+.footer {
+  margin-top: 40px; padding-top: 18px;
+  border-top: 1px solid #eef2f7;
+  font-size: 11px; color: #9aa5b8; display: flex; justify-content: space-between;
 }
 @media print {
-  body { background: white; color: black; }
-  h2 { color: black; border-color: #ccc; }
-  b { color: black; }
-  table, th, td { border-color: #ccc !important; background: white !important; }
-  .print-btn { display: none; }
+  body { background: white; }
+  .page { box-shadow: none; border: 0; margin: 0 auto; padding: 24mm 18mm; max-width: none; }
+  .lang-bar { display: none; }
+  /* Keep colors */
+  h2 { color: #2563eb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .title-bar { border-bottom-color: #2563eb !important; }
+  table { border-color: #cdd5e0 !important; }
+  th { background: #f3f5f8 !important; -webkit-print-color-adjust: exact; }
 }
 </style>
 """
@@ -1688,6 +1795,11 @@ td { border-top: 1px solid #1f2733; font-size: 13px; }
 
 @app.route("/run/<name>/report.html")
 def run_report_html(name):
+    from flask import request as freq
+    import time as _time
+    lang = freq.args.get("lang", "tr")
+    if lang not in ("tr", "en"):
+        lang = "tr"
     safe = "".join(c for c in name if c.isalnum() or c in "-_.")
     if safe != name:
         abort(400)
@@ -1696,12 +1808,30 @@ def run_report_html(name):
         abort(404)
     sys.path.insert(0, str(ROOT / "scripts"))
     from make_report import build_report_md
-    md = build_report_md(d)
+    md = build_report_md(d, lang=lang)
     body = _md_to_html(md)
-    return (f"<!doctype html><html><head><meta charset=utf-8>"
-            f"<title>Report {safe}</title>{REPORT_HTML_CSS}</head><body>"
-            f'<a href="javascript:window.print()" class="print-btn">'
-            f'PDF olarak yazdır</a>{body}</body></html>')
+    tr = lang == "tr"
+    title = "Kokpit Görev Raporu" if tr else "Kokpit Mission Report"
+    print_btn = "PDF olarak yazdır" if tr else "Print as PDF"
+    other_lang = "EN" if tr else "TR"
+    other_url = f"?lang={'en' if tr else 'tr'}"
+    date_str = _time.strftime("%d.%m.%Y %H:%M") if tr else _time.strftime("%Y-%m-%d %H:%M")
+    footer = (f"Kokpit · Teknofest 2026 · "
+              f"{'Otomatik üretildi' if tr else 'Auto-generated'} {date_str}")
+    return (f"<!doctype html><html lang='{lang}'><head><meta charset=utf-8>"
+            f"<title>{title} — {safe}</title>{REPORT_HTML_CSS}</head><body>"
+            f'<div class="lang-bar">'
+            f'  <a href="{other_url}" class="alt">{other_lang}</a>'
+            f'  <button onclick="window.print()">{print_btn}</button>'
+            f'</div>'
+            f'<div class="page">'
+            f'<div class="title-bar">'
+            f'  <span class="brand-tag">KOKPIT</span>'
+            f'  <span class="report-date">{date_str}</span>'
+            f'</div>'
+            f'{body}'
+            f'<div class="footer"><span>{footer}</span><span>{safe}</span></div>'
+            f'</div></body></html>')
 
 
 @app.route("/run/<name>/track.tlog")

@@ -33,13 +33,22 @@ def _mkrun(d: Path):
     ]))
 
 
-def test_make_report_md(tmp_path):
+def test_make_report_md_tr(tmp_path):
     from make_report import build_report_md
     _mkrun(tmp_path / "r1")
-    md = build_report_md(tmp_path / "r1")
+    md = build_report_md(tmp_path / "r1", lang="tr")
+    assert "Görev Raporu" in md
+    assert "Başarılı teslimat" in md
+    assert "Önemli rakamlar" in md
+
+
+def test_make_report_md_en(tmp_path):
+    from make_report import build_report_md
+    _mkrun(tmp_path / "r1")
+    md = build_report_md(tmp_path / "r1", lang="en")
     assert "Mission Report" in md
-    assert "Delivered" in md or "package_delivered" in md
-    assert "Telemetry stats" in md
+    assert "Delivered" in md
+    assert "Key numbers" in md
 
 
 def test_csv_to_tlog(tmp_path):
@@ -66,10 +75,22 @@ def client(tmp_path, monkeypatch):
 def test_report_md_endpoint(client):
     c, td = client
     _mkrun(td / "r1")
-    r = c.get("/run/r1/report.md")
+    r = c.get("/run/r1/report.md?lang=en")
     assert r.status_code == 200
     assert r.mimetype == "text/markdown"
     assert b"Mission Report" in r.data
+    r2 = c.get("/run/r1/report.md?lang=tr")
+    assert "Görev Raporu".encode() in r2.data
+
+
+def test_report_html_endpoint(client):
+    c, td = client
+    _mkrun(td / "r1")
+    r = c.get("/run/r1/report.html?lang=tr")
+    assert r.status_code == 200
+    assert b"<table" in r.data
+    assert "Görev Raporu".encode() in r.data
+    assert b"KOKPIT" in r.data
 
 
 def test_tlog_endpoint(client):
