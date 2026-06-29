@@ -308,37 +308,88 @@ INDEX_HTML = (BASE_CSS + """
   <h1 class="page-title">Mission archive</h1>
   <p class="page-sub">Otonom teslimat görev kayıtları — events, telemetry ve plot.</p>
 
-{% if runs %}
-<div class="grid">
-  {% for r in runs %}
-  <a class="card {{ 'ok' if r.delivered else ('err' if r.abort_reason else 'warn') }}"
-     href="/run/{{ r.name }}">
-    <h3>{{ r.name }}</h3>
-    <div class="card-meta">{{ r.duration_s }}s mission</div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:18px;align-items:center">
+    <input id="search" type="search" placeholder="Search runs…" autocomplete="off"
+      style="background:var(--bg-1);border:1px solid var(--border);color:var(--text);padding:8px 12px;border-radius:8px;font-size:13px;min-width:240px;font-family:'JetBrains Mono',monospace"/>
+    <div id="filters" style="display:flex;gap:6px">
+      <button class="filter-btn active" data-f="all">All</button>
+      <button class="filter-btn" data-f="delivered">Delivered</button>
+      <button class="filter-btn" data-f="abort">Aborted</button>
+      <button class="filter-btn" data-f="incomplete">Incomplete</button>
+    </div>
+    <div style="margin-left:auto;color:var(--text-soft);font-size:11px"><span id="run-count">{{ runs|length }}</span> runs · live</div>
+  </div>
+  <style>
+    .filter-btn { background:var(--bg-1);border:1px solid var(--border);color:var(--text-dim);padding:6px 12px;border-radius:6px;font-size:12px;cursor:pointer;font-weight:500;font-family:inherit }
+    .filter-btn:hover { color:var(--text);border-color:var(--border-strong) }
+    .filter-btn.active { background:var(--accent-soft);color:var(--accent);border-color:rgba(88,166,255,.3) }
+  </style>
+
+  <div id="runs-grid" class="grid"></div>
+  <div id="empty-state" style="display:none" class="empty">
+  """ + ICON["satellite"] + """
+  <p>Eşleşen kayıt yok.</p>
+  </div>
+</div>
+
+<script>
+let _filter = 'all', _query = '', _runs = [];
+const card = r => {
+  const cls = r.delivered ? 'ok' : (r.abort_reason ? 'err' : 'warn');
+  const chip = r.delivered
+    ? '<span class="chip ok">""" + ICON["package"] + """ delivered</span>'
+    : r.abort_reason
+    ? `<span class="chip err">""" + ICON["octagon_x"] + """ ${r.abort_reason}</span>`
+    : '<span class="chip warn">incomplete</span>';
+  return `<a class="card ${cls}" href="/run/${r.name}">
+    <h3>${r.name}</h3>
+    <div class="card-meta">${r.duration_s}s mission</div>
     <div class="card-row">
       <div class="card-stats">
-        <span>""" + ICON["clock"] + """ {{ r.duration_s }}s</span>
-        <span>""" + ICON["activity"] + """ {{ r.telemetry_rows }}</span>
-      </div>
-      {% if r.delivered %}
-        <span class="chip ok">""" + ICON["package"] + """ delivered</span>
-      {% elif r.abort_reason %}
-        <span class="chip err">""" + ICON["octagon_x"] + """ {{ r.abort_reason }}</span>
-      {% else %}
-        <span class="chip warn">incomplete</span>
-      {% endif %}
-    </div>
-  </a>
-  {% endfor %}
-</div>
-{% else %}
-<div class="empty">
-  """ + ICON["satellite"] + """
-  <p>Henüz görev kaydı yok.</p>
-  <p style="margin-top:6px;font-size:12px">Yeni run <code>runs/&lt;ts&gt;/</code> dizininde otomatik görünür.</p>
-</div>
-{% endif %}
-</div>
+        <span>""" + ICON["clock"] + """ ${r.duration_s}s</span>
+        <span>""" + ICON["activity"] + """ ${r.telemetry_rows}</span>
+      </div>${chip}</div></a>`;
+};
+
+const match = r => {
+  if (_query && !r.name.toLowerCase().includes(_query)) return false;
+  if (_filter === 'delivered') return r.delivered;
+  if (_filter === 'abort') return !!r.abort_reason;
+  if (_filter === 'incomplete') return !r.delivered && !r.abort_reason;
+  return true;
+};
+
+const render = () => {
+  const grid = document.getElementById('runs-grid');
+  const filtered = _runs.filter(match);
+  grid.innerHTML = filtered.map(card).join('');
+  document.getElementById('run-count').textContent = filtered.length;
+  document.getElementById('empty-state').style.display = filtered.length ? 'none' : '';
+};
+
+document.getElementById('search').addEventListener('input', e => {
+  _query = e.target.value.toLowerCase().trim();
+  render();
+});
+
+document.querySelectorAll('.filter-btn').forEach(b => b.addEventListener('click', e => {
+  document.querySelectorAll('.filter-btn').forEach(x => x.classList.remove('active'));
+  e.target.classList.add('active');
+  _filter = e.target.dataset.f;
+  render();
+}));
+
+async function refresh() {
+  try {
+    const r = await fetch('/api/runs');
+    const data = await r.json();
+    _runs = data.runs || [];
+    render();
+  } catch(e) {}
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
 """)
 
 RUN_HTML = (BASE_CSS + """
@@ -738,7 +789,24 @@ def run_failsafe(name):
 
 @app.route("/api/runs")
 def api_runs():
-    return jsonify({"runs": [r["name"] for r in _list_runs()]})
+    return jsonify({"runs": _list_runs()})
+
+
+@app.route("/run/<name>/events.json")
+def run_events_json(name):
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    ev = RUNS_DIR / safe / "events.jsonl"
+    if not ev.exists():
+        return jsonify({"events": []})
+    out = []
+    for ln in ev.read_text().splitlines():
+        try:
+            out.append(json.loads(ln))
+        except Exception:
+            continue
+    return jsonify({"events": out})
 
 
 def main():

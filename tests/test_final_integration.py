@@ -88,7 +88,7 @@ def test_step_5_replay_dashboard_200(tmp_path, monkeypatch):
     c = rd.app.test_client()
     r = c.get("/")
     assert r.status_code == 200
-    assert b"20260629_120000" in r.data
     r2 = c.get("/api/runs")
     assert r2.status_code == 200
-    assert "20260629_120000" in r2.get_json()["runs"]
+    names = [x["name"] for x in r2.get_json()["runs"]]
+    assert "20260629_120000" in names

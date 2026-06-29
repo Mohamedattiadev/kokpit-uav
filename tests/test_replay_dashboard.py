@@ -30,7 +30,9 @@ def test_index_lists_runs(client, tmp_path):
     (tmp_path / "20260101_120000").mkdir()
     r = client.get("/")
     assert r.status_code == 200
-    assert b"20260101_120000" in r.data
+    # Now client-side rendered — verify via API
+    api = client.get("/api/runs").get_json()
+    assert any(x["name"] == "20260101_120000" for x in api["runs"])
 
 
 def test_run_view_404_when_missing(client):
@@ -49,4 +51,5 @@ def test_api_runs_json(client, tmp_path):
     r = client.get("/api/runs")
     assert r.status_code == 200
     data = r.get_json()
-    assert set(data["runs"]) == {"run_a", "run_b"}
+    names = {r["name"] for r in data["runs"]}
+    assert names == {"run_a", "run_b"}
