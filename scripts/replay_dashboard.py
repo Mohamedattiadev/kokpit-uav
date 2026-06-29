@@ -396,10 +396,98 @@ RUN_HTML = (BASE_CSS + """
   </div>
 
   {% if tel_rows > 0 %}
+  <div class="section-label">Flight path</div>
+  <div class="plot-card" style="padding:0">
+    <div id="map" style="height:380px;width:100%;background:var(--bg-2);border-radius:10px"></div>
+  </div>
+
+  <div class="section-label">Phase timeline</div>
+  <div class="plot-card" style="padding:14px 18px">
+    <div id="phases" style="font-family:'JetBrains Mono',monospace;font-size:12px"></div>
+  </div>
+
   <div class="section-label">Telemetry · altitude + battery</div>
   <div class="plot-card"><img src="/run/{{ name }}/plot.png" alt="plot"/></div>
+
+  <div class="section-label">Failsafe events</div>
+  <div class="plot-card" id="failsafe-panel" style="padding:14px 18px;color:var(--text-soft);font-size:13px">Yükleniyor…</div>
   {% endif %}
 </div>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script>
+(async function(){
+  const name = {{ name|tojson }};
+  // Track / map
+  try {
+    const r = await fetch(`/run/${name}/track.json`);
+    const data = await r.json();
+    if (data.points && data.points.length) {
+      const pts = data.points.map(p => [p.lat, p.lon]);
+      const map = L.map('map', { zoomControl: true, attributionControl: false });
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png', {
+        maxZoom: 19, subdomains: 'abcd'
+      }).addTo(map);
+      const line = L.polyline(pts, { color: '#58a6ff', weight: 3, opacity: 0.85 }).addTo(map);
+      L.circleMarker(pts[0], { radius: 6, color: '#3fb950', fillOpacity: 1 })
+        .bindTooltip('start').addTo(map);
+      L.circleMarker(pts[pts.length-1], { radius: 6, color: '#d29922', fillOpacity: 1 })
+        .bindTooltip('end').addTo(map);
+      map.fitBounds(line.getBounds(), { padding: [20, 20] });
+    } else {
+      document.getElementById('map').innerHTML =
+        '<div style="padding:60px 20px;text-align:center;color:var(--text-soft);font-size:13px">Track verisi yok (GPS fix yokken kaydedilen run)</div>';
+    }
+  } catch(e) { console.error(e); }
+
+  // Phase timeline
+  try {
+    const r = await fetch(`/run/${name}/phases.json`);
+    const data = await r.json();
+    const colors = {
+      IDLE: '#6b7689', WAIT_PACKET: '#6b7689', PREFLIGHT: '#58a6ff',
+      TAKEOFF: '#58a6ff', NAVIGATE: '#a371f7', SEARCH_MARKER: '#a371f7',
+      PRECISION_APPROACH: '#db61a2', BIOMETRIC_VERIFY: '#db61a2',
+      DROP_PACKAGE: '#3fb950', RETURN_HOME: '#d29922', LANDING: '#d29922',
+      DISARM: '#6b7689', MISSION_COMPLETE: '#3fb950', ABORT: '#f85149',
+      FAILED: '#f85149', READ_ONLY: '#d29922',
+    };
+    if (!data.phases.length) {
+      document.getElementById('phases').innerHTML =
+        '<span style="color:var(--text-soft)">Phase verisi yok</span>';
+      return;
+    }
+    const total = Math.max(1, data.phases[data.phases.length-1].end);
+    let html = '<div style="display:flex;height:34px;border-radius:6px;overflow:hidden;border:1px solid var(--border)">';
+    data.phases.forEach(p => {
+      const w = ((p.end - p.start) / total * 100).toFixed(2);
+      const c = colors[p.state] || '#6b7689';
+      html += `<div title="${p.state} (${(p.end-p.start).toFixed(0)}s)" style="flex:0 0 ${w}%;background:${c};display:grid;place-items:center;font-size:10px;color:#0d1117;font-weight:600;overflow:hidden;white-space:nowrap;padding:0 4px">${w >= 6 ? p.state : ''}</div>`;
+    });
+    html += '</div>';
+    html += '<div style="display:flex;justify-content:space-between;margin-top:8px;color:var(--text-soft);font-size:11px"><span>0s</span><span>' + total.toFixed(0) + 's</span></div>';
+    document.getElementById('phases').innerHTML = html;
+  } catch(e) { console.error(e); }
+
+  // Failsafe events
+  try {
+    const r = await fetch(`/run/${name}/failsafe.json`);
+    const data = await r.json();
+    const panel = document.getElementById('failsafe-panel');
+    if (!data.events.length) {
+      panel.innerHTML = '<span style="color:var(--ok)">✓ Bu görevde failsafe tetiklenmedi</span>';
+    } else {
+      let html = '<div style="display:flex;flex-direction:column;gap:6px">';
+      data.events.forEach(e => {
+        html += `<div style="display:flex;gap:14px;font-family:'JetBrains Mono',monospace;font-size:12px"><span style="color:var(--err);font-weight:600">⚠ FAILSAFE</span><span>t+${e.t.toFixed(1)}s</span><span style="color:var(--text-soft)">${e.state}</span></div>`;
+      });
+      html += '</div>';
+      panel.innerHTML = html;
+    }
+  } catch(e) { console.error(e); }
+})();
+</script>
 """)
 
 
@@ -549,6 +637,103 @@ def plot_png(name):
     buf.seek(0)
     from flask import Response
     return Response(buf.read(), mimetype="image/png")
+
+
+def _read_telemetry(d: Path) -> list[dict]:
+    import csv
+    tc = d / "telemetry.csv"
+    if not tc.exists():
+        return []
+    rows = []
+    with tc.open() as f:
+        for row in csv.DictReader(f):
+            rows.append(row)
+    return rows
+
+
+@app.route("/run/<name>/track.json")
+def run_track(name):
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    d = RUNS_DIR / safe
+    if not d.exists():
+        abort(404)
+    pts = []
+    for row in _read_telemetry(d):
+        try:
+            lat = float(row["lat"])
+            lon = float(row["lon"])
+            if abs(lat) < 0.001 and abs(lon) < 0.001:
+                continue  # zero-fill row
+            pts.append({"lat": lat, "lon": lon,
+                        "alt": float(row.get("alt_rel", 0)),
+                        "mode": row.get("mode", "")})
+        except Exception:
+            continue
+    return jsonify({"points": pts})
+
+
+@app.route("/run/<name>/phases.json")
+def run_phases(name):
+    """mission_state sütununu zaman-aralık dilimlerine indirge."""
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    d = RUNS_DIR / safe
+    if not d.exists():
+        abort(404)
+    phases = []
+    cur_state = None
+    cur_start = None
+    first_ts = None
+    for row in _read_telemetry(d):
+        try:
+            ts = float(row["ts_unix_us"]) / 1e6
+        except Exception:
+            continue
+        if first_ts is None:
+            first_ts = ts
+        st = row.get("mission_state", "") or "?"
+        if st != cur_state:
+            if cur_state is not None:
+                phases.append({"state": cur_state,
+                               "start": cur_start - first_ts,
+                               "end": ts - first_ts})
+            cur_state = st
+            cur_start = ts
+    if cur_state is not None and cur_start is not None and first_ts is not None:
+        # son dilim — telemetry son satır zamanına kadar
+        last_ts = float(_read_telemetry(d)[-1]["ts_unix_us"]) / 1e6
+        phases.append({"state": cur_state,
+                       "start": cur_start - first_ts,
+                       "end": last_ts - first_ts})
+    return jsonify({"phases": phases})
+
+
+@app.route("/run/<name>/failsafe.json")
+def run_failsafe(name):
+    safe = "".join(c for c in name if c.isalnum() or c in "-_.")
+    if safe != name:
+        abort(400)
+    d = RUNS_DIR / safe
+    if not d.exists():
+        abort(404)
+    events = []
+    first_ts = None
+    prev_active = False
+    for row in _read_telemetry(d):
+        try:
+            ts = float(row["ts_unix_us"]) / 1e6
+            active = row.get("failsafe_active", "0") == "1"
+        except Exception:
+            continue
+        if first_ts is None:
+            first_ts = ts
+        if active and not prev_active:
+            events.append({"t": ts - first_ts, "state": row.get("mission_state", "")})
+        prev_active = active
+    return jsonify({"events": events})
 
 
 @app.route("/api/runs")
