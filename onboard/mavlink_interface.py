@@ -102,6 +102,13 @@ class DroneController:
         hb = self.master.wait_heartbeat(timeout=timeout)
         if hb is None:
             raise TimeoutError("Heartbeat alınamadı — bağlantıyı kontrol et")
+        # N5 — SysID çakışma kontrolü. Beklenen değilse warn (ArduCopter SYSID_THISMAV
+        # ile config edilir; yarışmada birden fazla takım yan yana uçabilir).
+        expected_sysid = CFG.link.target_sysid
+        actual_sysid = self.master.target_system
+        if actual_sysid != expected_sysid:
+            print(f"[MAV] UYARI: sysid mismatch (beklenen={expected_sysid}, "
+                  f"gelen={actual_sysid}). KOKPIT_SYSID env override edilebilir.")
         print(f"[MAV] Heartbeat OK (sys {self.master.target_system}, "
               f"comp {self.master.target_component})")
         self._request_streams()

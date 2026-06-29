@@ -44,6 +44,10 @@ class LinkConfig:
     lora_port_real: str = "/dev/ttyUSB0"
     lora_baud: int = 9600              # E32 varsayılan UART hızı
 
+    # N5 — SysID çakışma koruma. Default 1 (ArduPilot). Yarışmada KOKPIT_SYSID env
+    # ile override edilebilir (2+ takım yan yana uçtuğunda telemetri karışmasın).
+    target_sysid: int = int(os.environ.get("KOKPIT_SYSID", "1"))
+
     @property
     def mavlink_connection_string(self) -> str:
         return self.mavlink_sim if SIMULATION else self.mavlink_real
