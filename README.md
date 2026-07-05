@@ -49,6 +49,7 @@ Gerçek donanım için (Jetson kurulumu, ArduPilot parametreleri, kablolama, kal
 | Belge | İçerik |
 |---|---|
 | [`docs/DONANIM_PLANI.md`](docs/DONANIM_PLANI.md) | **🔧 Donanım ekibi buradan başlamalı.** 4 iş için adım adım rehber + komut + sorun giderme. |
+| [`docs/DONANIM_DURUM.md`](docs/DONANIM_DURUM.md) | **Kısa özet: şu an tam olarak ne kaldı, kim yapacak.** Detaya girmeden hızlı bakış için. |
 | [`docs/KILAVUZ.md`](docs/KILAVUZ.md) | Adım adım kurulum + saha kullanım kılavuzu. |
 | [`docs/PLAN.md`](docs/PLAN.md) | Yapılacaklar listesi. 4 sprint, görev atamaları, effort tahminleri. M1–M12 tamam. |
 | [`docs/QUESTIONS_FOR_TEAM.md`](docs/QUESTIONS_FOR_TEAM.md) | Takım kararı bekleyen / verilen sorular ve gerekçeleri. |
