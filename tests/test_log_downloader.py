@@ -72,6 +72,18 @@ def test_download_no_entry():
     assert ld.download_latest_log(mav) is None
 
 
+def test_download_uses_given_run_dir(tmp_path):
+    """run_dir verilirse yeni bir timestamp'li alt dizin açılmamalı — mission.py
+    bunu event_logger'ın açtığı runs/<ts>/ ile aynı dizine dataflash.bin
+    yazmak için kullanır (events.jsonl + telemetry.csv ile birlikte)."""
+    mav = _make_mav(size=120)
+    shared_dir = tmp_path / "20260705_014911"
+    shared_dir.mkdir()
+    out = ld.download_latest_log(mav, run_dir=str(shared_dir), timeout_s=5.0)
+    assert out == os.path.join(str(shared_dir), "dataflash.bin")
+    assert os.path.exists(out)
+
+
 def test_plot_summarize_empty():
     s = pm.summarize([])
     assert s["count"] == 0

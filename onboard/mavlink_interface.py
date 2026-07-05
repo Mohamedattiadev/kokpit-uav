@@ -94,6 +94,18 @@ class DroneController:
     def connect(self, timeout: float = 30.0) -> None:
         if self.master is not None and self.link_alive():
             return   # zaten bağlı (çift connect güvenli)
+        if self.master is not None:
+            # Önceki bağlantı ölü/bilinmiyor — yeniden bağlanmadan önce eski
+            # rx thread'i ve soketi kapat. Aksi halde iki rx thread aynı anda
+            # heartbeat okumaya çalışır ve link_alive() aralıklı False döner.
+            self._running = False
+            if self._rx_thread:
+                self._rx_thread.join(timeout=2.0)
+            try:
+                self.master.close()
+            except Exception:
+                pass
+            self.master = None
         print(f"[MAV] Bağlanılıyor: {self.conn_str}")
         if self.baud:
             self.master = mavutil.mavlink_connection(self.conn_str, baud=self.baud)
@@ -102,6 +114,12 @@ class DroneController:
         hb = self.master.wait_heartbeat(timeout=timeout)
         if hb is None:
             raise TimeoutError("Heartbeat alınamadı — bağlantıyı kontrol et")
+        # wait_heartbeat() burada bir HEARTBEAT tükettiği için rx thread'in
+        # KENDİ ilk mesajını görmesini beklemeden last_heartbeat'i hemen
+        # işaretle — aksi halde bağlantı sonrası ~1 sn'lik pencerede
+        # link_alive() yanlışlıkla False döner (preflight kontrolleri erken
+        # çağrılırsa "MAVLink heartbeat yok" ile sahte kalkış iptaline yol açar).
+        self.tel.last_heartbeat = time.time()
         # N5 — SysID çakışma kontrolü. Beklenen değilse warn (ArduCopter SYSID_THISMAV
         # ile config edilir; yarışmada birden fazla takım yan yana uçabilir).
         expected_sysid = CFG.link.target_sysid

@@ -50,6 +50,14 @@ def main():
                     help="biyometrik doğrulama başarısız senaryosu")
     ap.add_argument("--save-video", action="store_true",
                     help="logs/demo.mp4 olarak kamera kaydı üret")
+    ap.add_argument("--out", default="../logs/demo.mp4",
+                    help="video çıktı yolu (varsayılan ../logs/demo.mp4)")
+    ap.add_argument("--wind-speed", type=float, default=0.0,
+                    help="rüzgar hızı m/s (gerçekçi rüzgar sweep senaryosu için)")
+    ap.add_argument("--wind-dir", type=float, default=0.0,
+                    help="rüzgarın estiği yön (derece)")
+    ap.add_argument("--wind-turb", type=float, default=0.0,
+                    help="türbülans/gust şiddeti (0..1)")
     args = ap.parse_args()
 
     # Hızlı + tespit edilebilir profil
@@ -62,6 +70,9 @@ def main():
     CFG.pid.max_z_speed_ms = 1.5
 
     drone = FakeDrone()
+    drone.wind_speed_ms = args.wind_speed
+    drone.wind_dir_deg = args.wind_dir
+    drone.wind_turb = args.wind_turb
     mlat = drone.home_lat + 15.0 / 111320.0
     mlon = drone.home_lon
     cam = SimDownCamera(drone, mlat, mlon, marker_len_m=CFG.aruco.marker_length_m)
@@ -70,8 +81,8 @@ def main():
 
     writer = None
     if args.save_video:
-        os.makedirs("../logs", exist_ok=True)
-        writer = cv2.VideoWriter("../logs/demo.mp4",
+        os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
+        writer = cv2.VideoWriter(args.out,
                                  cv2.VideoWriter_fourcc(*"mp4v"),
                                  15, (CFG.camera.width, CFG.camera.height))
 
@@ -101,7 +112,7 @@ def main():
     ok = m.run()
     if writer:
         writer.release()
-        print("[DEMO] Video: logs/demo.mp4")
+        print(f"[DEMO] Video: {args.out}")
     m.close()
 
     print("\n================ DEMO SONUCU ================")

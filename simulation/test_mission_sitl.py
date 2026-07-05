@@ -52,6 +52,15 @@ def main():
     CFG.flight.cruise_altitude_m = 12.0
     CFG.flight.search_altitude_m = 8.0
     CFG.flight.drop_altitude_m = 2.5
+    # ArduPilot SITL'in MultiCopter fizik modeli SIM_BATT_VOLTAGE'ı onurlandırmaz
+    # (bkz. libraries/SITL/SIM_Aircraft.cpp update_battery yorumu); BATTERY_STATUS
+    # her zaman ~12.6V (3S sabit) raporlar. Gerçek donanım eşiği (6S, 21.0V) burada
+    # anlamsız olur; sadece bu SITL koşusu için simülatöre uygun eşik kullan.
+    # Üç eşik de (prearm warn / in-flight RTL low / in-flight LAND critical)
+    # override edilir ki SITL'in sahte 12.6V'u hiçbirini yanlışlıkla tetiklemesin.
+    CFG.safety.battery_warn_voltage = 5.0
+    CFG.safety.battery_low_voltage = 5.0
+    CFG.safety.battery_critical_voltage = 4.0
 
     drone = DroneController()
     drone.connect()

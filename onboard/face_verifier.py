@@ -351,6 +351,7 @@ class FaceVerifier:
                time.time() - start < self.cfg.verify_timeout_s):
             ok, frame = camera.read()
             if not ok or frame is None:
+                time.sleep(0.05)
                 continue
             r = self.verify_frame(recipient_id, frame)
             if on_frame:

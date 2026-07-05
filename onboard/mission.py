@@ -211,8 +211,7 @@ class Mission:
                     self._push_failsafe(
                         self.PRIO_BATTERY_CRT, "BATTERY_CRT",
                         f"Kritik batarya {t.battery_voltage:.2f}V")
-                elif t.battery_voltage < getattr(
-                        s, "battery_low_voltage", s.battery_critical_voltage + 1.0):
+                elif t.battery_voltage < s.battery_low_voltage:
                     self._push_failsafe(
                         self.PRIO_BATTERY_LOW, "BATTERY_LOW",
                         f"Düşük batarya {t.battery_voltage:.2f}V")
@@ -528,7 +527,8 @@ class Mission:
         # Post-mortem: dataflash log'unu Jetson'a çek (donanım yoksa no-op).
         try:
             from log_downloader import download_latest_log
-            download_latest_log(self.drone, output_dir="runs", timeout_s=20.0)
+            download_latest_log(self.drone, output_dir="runs", timeout_s=20.0,
+                                run_dir=self._run_dir)
         except Exception as e:
             print(f"[LOG] indirme atlandı: {e}")
         self.fsm.transition(MissionState.MISSION_COMPLETE, force=True)
@@ -547,9 +547,17 @@ class Mission:
                 time.sleep(0.5)
             self.fsm.transition(MissionState.DISARM, force=True)
             return
-        # Kritik batarya/link ise RTL en güvenlisi (ArduPilot kendi failsafe'i de var)
+        # BATTERY_CRT: rapor karar ağacı "en yakın güvenli alana in" diyor —
+        # RTL ile eve dönmeye çalışmak (mesafeye göre dakikalarca sürebilir)
+        # kritik pilde havada kalmaya devam etmek demektir. Diğer tüm abort
+        # nedenlerinde (link kaybı, GPS kaybı, batarya henüz sadece LOW
+        # seviyesinde) RTL en güvenli seçenek — ArduPilot'un kendi batarya
+        # failsafe'i de zaten paralel çalışır.
         try:
-            self.drone.set_mode("RTL")
+            if "BATTERY_CRT" in self._abort_reason:
+                self.drone.set_mode("LAND")
+            else:
+                self.drone.set_mode("RTL")
         except Exception:
             self.drone.set_mode("LAND")
         # İniş/disarm bekle

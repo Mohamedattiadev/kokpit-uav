@@ -55,6 +55,21 @@ class FakeDrone:
         self.battery_voltage = 24.0
         self.crashed = False
 
+        # --- Gerçek-dünya arıza enjeksiyon parametreleri (test amaçlı) ---
+        # Rüzgar: ArduPilot SITL SIM_WIND_SPD/DIR/TURB'a benzer basitleştirilmiş
+        # model — sabit rüzgar vektörü + Gaussian gust (türbülans) gürültüsü.
+        self.wind_speed_ms = 0.0
+        self.wind_dir_deg = 0.0     # rüzgarın ESTİĞİ yön (meteorolojik, kuzeyden CW)
+        self.wind_turb = 0.0        # 0..1, gust şiddeti ölçeği
+        # Attitude/IMU fault injection (crash detection testleri için)
+        self.roll_deg = 0.0
+        self.pitch_deg = 0.0
+        self.accel_z_g = 1.0
+        # GPS/link sağlık enjeksiyonu (varsayılan: sağlıklı 3D fix)
+        self.fix_type = 3
+        self.satellites = 14
+        self.hdop = 0.7
+
     # --------------------------------------------------- yaşam döngüsü
     def connect(self, timeout=30.0):
         self._running = True
@@ -73,14 +88,14 @@ class FakeDrone:
                 lat=self.lat, lon=self.lon, alt_rel=self.alt,
                 alt_amsl=900 + self.alt, heading=self.heading,
                 battery_voltage=self.battery_voltage, battery_remaining=80,
-                satellites=14, hdop=0.7, fix_type=3,
+                satellites=self.satellites, hdop=self.hdop, fix_type=self.fix_type,
                 armed=self.armed, mode=self.mode, ekf_ok=True,
                 last_heartbeat=time.time(), last_update=time.time(),
                 # Sprint 1: lidar + IMU sim alanları
                 lidar_alt=self.alt, lidar_ok=True,
                 lidar_last_update=time.time(),
-                roll=0.0, pitch=0.0, yaw=math.radians(self.heading),
-                accel_z_g=1.0)
+                roll=math.radians(self.roll_deg), pitch=math.radians(self.pitch_deg),
+                yaw=math.radians(self.heading), accel_z_g=self.accel_z_g)
 
     def link_alive(self):
         return self._running
@@ -173,6 +188,25 @@ class FakeDrone:
             if elapsed < dt:
                 time.sleep(dt - elapsed)
 
+    def _wind_drift_ne(self, dt):
+        """Basitleştirilmiş rüzgar modeli: sabit rüzgar vektörü (ArduPilot SITL
+        SIM_WIND_SPD/DIR eşdeğeri) + Gaussian gust gürültüsü (SIM_WIND_TURB
+        eşdeğeri). Gerçek Dryden türbülans modeli değildir — kapalı döngü
+        PID'in rüzgar altında ne kadar sapma tolere ettiğini/derlediğini test
+        etmek için yeterli basitleştirilmiş bir bozan (disturbance) girdisidir.
+        wind_dir_deg: rüzgarın ESTİĞİ meteorolojik yön; İHA'yı bu yönün
+        (dir+180) tersine, yani rüzgar akışı yönünde iter."""
+        if self.wind_speed_ms <= 0.0:
+            return 0.0, 0.0
+        push_deg = math.radians(self.wind_dir_deg + 180.0)
+        dn = self.wind_speed_ms * math.cos(push_deg) * dt
+        de = self.wind_speed_ms * math.sin(push_deg) * dt
+        if self.wind_turb > 0.0:
+            gust = self.wind_turb * self.wind_speed_ms
+            dn += np.random.normal(0.0, gust) * dt
+            de += np.random.normal(0.0, gust) * dt
+        return dn, de
+
     def _step(self, dt):
         with self._lock:
             if not self.armed:
@@ -183,6 +217,9 @@ class FakeDrone:
                 if self.alt <= 0.05:
                     self.armed = False
                 return
+            wind_dn, wind_de = self._wind_drift_ne(dt)
+            self.lat += wind_dn / M_PER_DEG
+            self.lon += wind_de / (M_PER_DEG * math.cos(math.radians(self.lat)))
             # Velocity komutu taze mi? (0.5 sn'den eskiyse sıfırla)
             vel_active = (time.time() - self._vel_ts) < 0.5 and self._target is None
             if vel_active:
@@ -238,6 +275,16 @@ class SimDownCamera:
         canvas[b:b + size, b:b + size] = bit
         self.marker_img = cv2.cvtColor(canvas, cv2.COLOR_GRAY2BGR)
 
+        # --- Gerçek-dünya görüntü bozulma enjeksiyonu (test amaçlı) ---
+        # Literatür: oblique açı (perspektif), okluzyon, motion blur, düşük
+        # kontrast/parlaklık ArUco tespit hatalarının başlıca nedenleri
+        # (bkz. NEXT_SESSION araştırma notları — ArUco Nano / OpenCV tutorial
+        # / ResearchGate min-pixel-size çalışması).
+        self.oblique_deg = 0.0      # kameraya göre marker düzlem eğimi (0=tam alttan)
+        self.occlusion_frac = 0.0   # 0..1, marker'ın bir köşesini kapatan oran
+        self.brightness = 1.0       # <1 karanlık/backlit, >1 aşırı parlak/glare
+        self.motion_blur_px = 0     # yatay hareket bulanıklığı çekirdek boyu (piksel)
+
     def read(self):
         t = self.drone.telemetry()
         frame = np.full((self.h, self.w, 3), 180, np.uint8)  # zemin (gri)
@@ -259,6 +306,10 @@ class SimDownCamera:
         scale = code_px / 400.0
         size_px = int(min(560 * scale, max(self.w, self.h) * 2))
         m = cv2.resize(self.marker_img, (size_px, size_px))
+        if self.oblique_deg > 0.0:
+            m = self._apply_oblique(m, self.oblique_deg)
+        if self.occlusion_frac > 0.0:
+            m = self._apply_occlusion(m, self.occlusion_frac)
         x0 = int(u - size_px / 2)
         y0 = int(v - size_px / 2)
         # tamamen kare dışındaysa görünmez
@@ -269,7 +320,38 @@ class SimDownCamera:
         xe, ye = min(self.w, x0 + size_px), min(self.h, y0 + size_px)
         mx0, my0 = xs - x0, ys - y0
         frame[ys:ye, xs:xe] = m[my0:my0 + (ye - ys), mx0:mx0 + (xe - xs)]
+        if self.brightness != 1.0:
+            frame = np.clip(frame.astype(np.float32) * self.brightness, 0, 255).astype(np.uint8)
+        if self.motion_blur_px > 1:
+            k = np.zeros((self.motion_blur_px, self.motion_blur_px), np.float32)
+            k[self.motion_blur_px // 2, :] = 1.0 / self.motion_blur_px
+            frame = cv2.filter2D(frame, -1, k)
         return True, frame
+
+    @staticmethod
+    def _apply_oblique(marker_bgr, angle_deg):
+        """Perspektif eğim uygula (0=tam alttan bakış, ~70°=çok yatık açı).
+        Literatür: ChArUco kalibrasyon rehberleri oblique açıların tespiti
+        zorlaştırdığını, ama küçük-orta açılarda (kod bölgesi hâlâ kare
+        görünürken) hâlâ tespit edilebildiğini gösteriyor."""
+        h, w = marker_bgr.shape[:2]
+        squeeze = max(0.05, math.cos(math.radians(min(angle_deg, 85.0))))
+        src = np.float32([[0, 0], [w, 0], [w, h], [0, h]])
+        dx = w * (1 - squeeze) / 2.0
+        dst = np.float32([[dx, 0], [w - dx, 0], [w, h], [0, h]])
+        M = cv2.getPerspectiveTransform(src, dst)
+        return cv2.warpPerspective(marker_bgr, M, (w, h), borderValue=(180, 180, 180))
+
+    @staticmethod
+    def _apply_occlusion(marker_bgr, frac):
+        """Marker'ın bir köşesini (frac oranında) zemin rengiyle kapat —
+        gövde/anten gölgesi veya kısmi görüş engeli simülasyonu."""
+        h, w = marker_bgr.shape[:2]
+        frac = min(max(frac, 0.0), 0.9)
+        ow, oh = int(w * frac), int(h * frac)
+        out = marker_bgr.copy()
+        out[0:oh, 0:ow] = 180
+        return out
 
     def release(self):
         pass

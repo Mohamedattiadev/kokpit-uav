@@ -34,8 +34,15 @@ def _request_list(mav) -> Optional[tuple[int, int]]:
 
 
 def download_latest_log(mav, output_dir: str = "runs",
-                        timeout_s: float = 120.0) -> Optional[str]:
-    """En yeni dataflash log'u indir. Çıktı yolu döner veya None."""
+                        timeout_s: float = 120.0,
+                        run_dir: Optional[str] = None) -> Optional[str]:
+    """En yeni dataflash log'u indir. Çıktı yolu döner veya None.
+
+    run_dir verilirse (mission.py'nin event_logger için zaten açtığı dizin),
+    yeni bir timestamp'li dizin oluşturmak yerine oraya yazar — böylece
+    dataflash.bin, events.jsonl ve telemetry.csv aynı runs/<ts>/ altında
+    toplanır.
+    """
     if mav is None or getattr(mav, "master", None) is None:
         return None
     info = _request_list(mav)
@@ -45,8 +52,9 @@ def download_latest_log(mav, output_dir: str = "runs",
     last_id, size = info
     if size <= 0:
         return None
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(output_dir, ts)
+    if run_dir is None:
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        run_dir = os.path.join(output_dir, ts)
     os.makedirs(run_dir, exist_ok=True)
     out = os.path.join(run_dir, "dataflash.bin")
     received = bytearray(size)
