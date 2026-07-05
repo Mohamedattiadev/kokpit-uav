@@ -26,6 +26,21 @@ Proje raporu (jüri'ye sunulan resmi belge) → [`docs/report/884462.pdf`](docs/
 
 ---
 
+## Demo Videoları
+
+Simülasyon üzerinde kaydedilmiş uçtan uca görev videoları (`logs/`) —
+GitHub üzerinde dosyaya tıklayıp doğrudan izleyebilirsin:
+
+| Video | Senaryo |
+|---|---|
+| [`logs/gazebo_flight_3d.mp4`](logs/gazebo_flight_3d.mp4) | Gazebo'da gerçek 3D fizik simülasyonu: kalkış → hedefe gidiş → hassas yaklaşma → biyometrik doğrulama → paket bırakma → RTL → iniş. |
+| [`logs/demo.mp4`](logs/demo.mp4) | Standart yazılım demo'su (`make demo`) — tam otonom görev, donanımsız. |
+| [`logs/demo_reject.mp4`](logs/demo_reject.mp4) | Biyometrik doğrulama **başarısız** senaryosu — yanlış kişi tespit edilince teslimat iptal ediliyor. |
+| [`logs/demo_wind5ms.mp4`](logs/demo_wind5ms.mp4) | Saha rüzgar limiti olan 5 m/s rüzgar altında yaklaşma testi. |
+| [`logs/dashboard_replay_sitl.mp4`](logs/dashboard_replay_sitl.mp4) | SITL uçuşu sonrası web replay dashboard'unda (timeline + harita + grafik) görev tekrar oynatması. |
+
+---
+
 ## Hızlı Başlangıç
 
 Gerçek donanıma ihtiyaç yok — tüm pipeline simülasyonda çalışır:
