@@ -128,13 +128,17 @@ Yarışma günü için minimum: 2× LiPo, 4× pervane, 1× ESP32, 1× motor.
 
 ## Bekleyen — Donanım Hazır Olunca
 
-1. TensorRT ArcFace engine build (Jetson + JetPack 6.x gerekir)
+1. ~~TensorRT ArcFace engine build~~ — **kod tarafı TAMAM** ([PR #1](https://github.com/Mohamedattiadev/kokpit-uav/pull/1)), Jetson Orin Nano'da doğrulandı. Kalan: her cihaz kendi engine'ini derlemeli (bkz. `docs/DONANIM_PLANI.md` İŞ-1 Adım 1.5) + systemd servis kurulumu (sudo gerekiyor).
 2. Kamera kalibrasyon (chessboard 20 pose)
 3. Lidar/kamera extrinsics ölçümü → `onboard/configs/extrinsics.yaml`
 4. PID gain tuning (saha, 10–20 iterasyon)
 5. ArduCopter AUTOTUNE
 6. Geofence GPS köşelerinin sahada ölçülmesi
 7. Saha test uçuşları (Sprint 4)
+
+Ayrıca ESP32 yer istasyonu RX parser'ının **kod tarafı da TAMAM** oldu
+([PR #1](https://github.com/Mohamedattiadev/kokpit-uav/pull/1), bkz.
+`docs/DONANIM_PLANI.md` İŞ-3) — kalan: gerçek karta yükleme + saha LoRa testi.
 
 ---
 

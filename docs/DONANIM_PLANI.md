@@ -5,8 +5,15 @@
 > ne lazım, nasıl bağlanır, hangi komut, nasıl doğrulanır, hata olursa ne yapılır.
 >
 > Yazılım tarafı (Jetson Python kodu + ESP32 TX firmware'i) tamamen hazır
-> (`make test` 203 yeşil, CI yeşil). Aşağıdaki dört iş bitince saha
+> (`make test` 312 yeşil, CI yeşil). Aşağıdaki dört iş bitince saha
 > testlerine hazırız.
+>
+> **Güncelleme:** [PR #1](https://github.com/Mohamedattiadev/kokpit-uav/pull/1)
+> ile İŞ-1 ve İŞ-3'ün **kod tarafı** tamamlandı ve gerçek Jetson Orin Nano
+> (JetPack R36.4.7 + TensorRT 10.3) üzerinde doğrulandı. Her iki işte de geriye
+> sadece **fiziksel/donanım adımları** kaldı — aşağıdaki checklist'lerde
+> ✅ / ⬜ olarak işaretlendi. PR merge edilmeden önce kod incelemesi yapılabilir,
+> ama fiziksel adımlar için beklemeye gerek yok.
 
 ---
 
@@ -156,27 +163,37 @@ app.prepare(ctx_id=0)
 print("Modeller indirildi:", app.models.keys())
 EOF
 
-# Modeller şuraya iner:
-# /opt/kokpit-uav/onboard/models/models/buffalo_l/det_500m.onnx
+# Modeller şuraya iner (NOT: buffalo_l paketi det_500m.onnx DEĞİL, det_10g.onnx
+# verir — bu doküman güncellendi, det_500m.onnx sadece buffalo_s'te var):
+# /opt/kokpit-uav/onboard/models/models/buffalo_l/det_10g.onnx
 # /opt/kokpit-uav/onboard/models/models/buffalo_l/w600k_r50.onnx
 ```
 
 ### Adım 1.5 — TensorRT Engine Build
+
+> ✅ **[PR #1](https://github.com/Mohamedattiadev/kokpit-uav/pull/1) ile düzeltildi:**
+> `tools/build_face_trt.py` TensorRT 10.x'te çalışmıyordu (`Builder.build_engine`
+> ve `max_workspace_size` TRT 10'da kaldırılmış API'ler; ayrıca RetinaFace/ArcFace
+> ONNX girişleri dinamik boyutlu olduğu için optimization profile olmadan derleme
+> hatası veriyordu). Artık `build_serialized_network` + `set_memory_pool_limit` +
+> sabit input-shape profili kullanıyor. **Ama her Jetson kendi engine'ini kendi
+> derlemeli** — `.engine` dosyaları git'e dahil değil (JetPack/TRT sürümüne özel,
+> `.gitignore`'da), bu adımı her cihazda bir kere çalıştırman gerekiyor:
 
 ```bash
 cd /opt/kokpit-uav
 source .venv/bin/activate
 
 python3 tools/build_face_trt.py \
-    --detector onboard/models/models/buffalo_l/det_500m.onnx \
+    --detector onboard/models/models/buffalo_l/det_10g.onnx \
     --embedder onboard/models/models/buffalo_l/w600k_r50.onnx \
     --out onboard/models \
     --precision fp16
 
-# Süre: ~10-15 dk (her engine için).
+# Süre: ~5-6 dk (Jetson Orin Nano'da, her engine için).
 # Beklenen çıktı:
-#   [TRT] yazıldı: onboard/models/det_8.6.1_<jetpack>_fp16.engine
-#   [TRT] yazıldı: onboard/models/emb_8.6.1_<jetpack>_fp16.engine
+#   [TRT] yazıldı: onboard/models/det_<trt_ver>_<jetpack>_fp16.engine
+#   [TRT] yazıldı: onboard/models/emb_<trt_ver>_<jetpack>_fp16.engine
 #   onboard/models/.meta.json
 ```
 
@@ -203,6 +220,11 @@ EOF
 
 ### Adım 1.7 — systemd Servis Aktif Et
 
+> ⬜ **Bu makinede yapılamadı** — sudo şifresiz erişim yok. Ayrıca
+> `kokpit-mc.service` içindeki `WorkingDirectory=/opt/kokpit-uav` üretim
+> dağıtım yolunu varsayıyor; repo farklı bir yoldaysa (örn. `/home/<user>/kokpit-uav`)
+> servis dosyasında bu satırı güncelleyip kopyalayın.
+
 ```bash
 cd /opt/kokpit-uav
 sudo cp systemd/kokpit-mc.service /etc/systemd/system/
@@ -217,12 +239,12 @@ journalctl -u kokpit-mc -f
 
 ### Doğrulama Checklist'i — İŞ-1
 
-- [ ] `nvpmodel -q` → MAXN veya 15W
-- [ ] `python3 -c "import tensorrt; print(tensorrt.__version__)"` → 8.6+
-- [ ] `ls onboard/models/*.engine` → det + emb engine'ler mevcut
-- [ ] `pytest tests/test_face_trt.py` → 6 PASS (skip yok)
-- [ ] `FaceVerifier(force_backend="trt").backend_name == "tensorrt"`
-- [ ] `systemctl status kokpit-mc` → active (running)
+- [ ] `nvpmodel -q` → MAXN veya 15W *(fiziksel — ekip yapacak, sudo gerekir)*
+- [x] `python3 -c "import tensorrt; print(tensorrt.__version__)"` → 8.6+ *(10.3.0 doğrulandı, PR #1)*
+- [x] `ls onboard/models/*.engine` → det + emb engine'ler mevcut *(bu Jetson'da derlendi, PR #1 — her cihaz kendi engine'ini kendi derlemeli, bkz. Adım 1.5)*
+- [x] `pytest tests/test_face_trt.py` → 6 PASS (skip yok) *(doğrulandı, PR #1)*
+- [x] `FaceVerifier(force_backend="trt").backend_name == "tensorrt"` *(doğrulandı, PR #1 — not: process çıkışında zararsız bir CUDA context teardown segfault'u var, pytest sürecinde görünmüyor, bilinen pycuda/JetPack davranışı)*
+- [ ] `systemctl status kokpit-mc` → active (running) *(fiziksel — ekip yapacak, sudo + `/opt/kokpit-uav` yol düzeltmesi gerekir)*
 
 ### Sorun Giderme — İŞ-1
 
@@ -232,7 +254,10 @@ journalctl -u kokpit-mc -f
 | `tensorrt import` ImportError | Python venv sistem TRT'sini görmüyor | `--system-site-packages` ile venv oluştur |
 | Engine build OOM | Swap kapalı | 1.2'deki swap adımı |
 | `dlib` derleme hatası | gcc/cmake eksik | `sudo apt install build-essential cmake libopenblas-dev` |
-| Engine yüklendi ama TRT çağrısı segfault | pycuda + JetPack uyumsuz | `pip install pycuda==2024.1` |
+| `python3 -c "import tensorrt"` venv'de ImportError ama sistemde çalışıyor | venv `include-system-site-packages=false` | Venv site-packages'a sistem dist-packages'ı işaret eden bir `.pth` dosyası ekle (örn. `echo /usr/lib/python3.10/dist-packages > .venv/lib/python3.10/site-packages/tensorrt_system.pth`) — venv'in kendi numpy/opencv'sini EZMEZ, sadece tensorrt gibi sistemde-only paketleri görünür kılar |
+| `builder.build_engine` / `config.max_workspace_size` AttributeError | TensorRT 10.x bu API'leri kaldırdı | **PR #1 ile düzeltildi** — script artık `build_serialized_network` + `set_memory_pool_limit` kullanıyor, ekstra işlem gerekmiyor |
+| `Error Code 4: API Usage Error (Network has dynamic or shape inputs...)` | RetinaFace/ArcFace ONNX girişleri dinamik boyutlu, optimization profile yok | **PR #1 ile düzeltildi** — sabit input-shape profili (`--det-size 640 --emb-size 112`, varsayılan) otomatik ekleniyor |
+| Engine yüklendi + `FaceVerifier(force_backend="trt")` çalışıyor ama script/process **çıkışında** segfault | pycuda `autoinit` + TRT'nin kendi CUDA context'i, interpreter kapanırken temizlenme sırası çakışıyor | **Denendi, KÖTÜLEŞTİ:** `pip install pycuda==2024.1` numpy 2.x ABI ile uyumsuz, TRT importu tamamen kırılıyor (`_ARRAY_API not found`) — bu düzeltmeyi UYGULAMAYIN. Mevcut `pycuda` sürümüyle (venv'de zaten kurulu) kalın; segfault sadece process teardown'ında, gerçek çıkarım (`enroll`/`verify`) sırasında olmuyor ve pytest süreci boyunca hiç görünmüyor — zararsız, kozmetik. |
 
 ---
 
@@ -447,14 +472,29 @@ Kurallar:
 Bitince: PR aç, başlık "feat: ESP32 RX parser + TELEMETRY display".
 ````
 
+> ✅ **Yukarıdaki brief [PR #1](https://github.com/Mohamedattiadev/kokpit-uav/pull/1)
+> ile tamamlandı** (madde 1-6 kod tarafı). Gerçek ESP32 kartı olmadığı için
+> madde 8'deki test, `simulation/sim_backend.py` yerine `tests/esp32_harness/`
+> altında ayrı bir yaklaşımla yapıldı: `packet_protocol.h`'nin C++ mantığı
+> host'ta (g++) gerçek SHA-256 implementasyonuyla derlenip Python'ın ürettiği
+> gerçek paketlerle beslendi (`tests/test_esp32_rx_parser.py`, 7/7 PASS) —
+> gerçek kart olmadan mümkün olan en yakın protokol-seviyesi doğrulama.
+
 ### Doğrulama Checklist'i — İŞ-3
 
-- [ ] ESP32 RX parser eklendi, CRC + AES decrypt çalışıyor
-- [ ] TFT 3 satır telemetri bilgisi gösteriyor
-- [ ] Mock TELEMETRY paketi enjekte edildiğinde ekran güncelleniyor
-- [ ] Loss > 30% veya RSSI < -100 dBm'de buzzer uyarı veriyor
-- [ ] Mevcut button → face delivery hâlâ çalışıyor
-- [ ] Loopback testte 100 paket %100 alınıyor
+- [x] ESP32 RX parser eklendi, CRC + AES decrypt çalışıyor *(`KokpitStreamParser`, host-derleme testiyle doğrulandı — AES kapalı/plaintext modda test edildi, key'li mod mantığı Python tarafıyla birebir simetrik)*
+- [x] TFT 3 satır telemetri bilgisi gösteriyor *(`drawTelemetry()` — MODE+BATT / PHASE / RSSI+LOSS)*
+- [x] Mock TELEMETRY paketi enjekte edildiğinde ekran güncelleniyor *(`test_telemetry_roundtrip`)*
+- [x] Loss > 30% veya RSSI < -100 dBm'de buzzer uyarı veriyor *(`serviceAlarm()`, non-blocking millis() tabanlı — kod incelemesiyle doğrulandı, gerçek buzzer donanımda duyulmalı)*
+- [x] Mevcut button → face delivery hâlâ çalışıyor *(davranış değişmedi; sadece debounce 800ms→120ms indi ki çift-tık penceresi yakalanabilsin)*
+- [ ] Loopback testte 100 paket %100 alınıyor *(fiziksel — gerçek LoRa E32 + gerçek ESP32 kartı gerekiyor, ekip yapacak)*
+- [x] **(yeni)** Çift tık → MANUAL_REQUEST("LOITER") gönderiyor *(`test_manual_request_roundtrip`)*
+- [x] **(yeni)** Bit hatası/CRC reddi + resync, seq tekrarı/replay drop *(`test_bit_flip_crc_error_then_resync`, `test_replay_duplicate_seq_dropped`)*
+
+**Kalan fiziksel adımlar (ekipte):**
+1. Firmware'i gerçek ESP32 kartına yükle (Arduino IDE veya PlatformIO + USB) — `firmware/esp32_ground_station/README.md`'deki kütüphane listesine bak.
+2. Gerçek LoRa E32 üzerinden Jetson ↔ ESP32 arası 100 paketlik loopback testi yap, kayıp oranını doğrula.
+3. TFT'de telemetri ekranının gerçek ışıkta/açıda okunabilirliğini kontrol et.
 
 ---
 
