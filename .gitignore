@@ -52,6 +52,10 @@ dist/
 
 # PlatformIO (future)
 .pio/
+
+# ESP32 host-test harness derleme çıktısı + insightface indirilen modeller
+tests/esp32_harness/harness
+onboard/models/
 .pioenvs/
 .piolibdeps/
 

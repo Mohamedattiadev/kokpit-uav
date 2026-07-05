@@ -109,6 +109,49 @@ uint32_t packetsSent = 0;
 uint32_t lastButtonMs = 0;
 uint16_t recipientId = 7;       // legacy mode için (kullanılırsa)
 
+// ----------------- RX (LoRa'dan gelen TELEMETRY) -----------------
+KokpitStreamParser g_rxParser;
+bool     g_haveTelemetry = false;
+TelemetryBody g_lastTelemetry = {};
+uint32_t g_lastTelemetryMs = 0;
+
+// Sinyal kalitesi uyarısı — non-blocking (millis tabanlı, delay() YOK)
+static const uint32_t ALARM_PERIOD_MS = 3000;
+bool     g_alarmActive = false;
+uint32_t g_lastAlarmMs = 0;
+
+// Çift tık algısı (MANUAL_REQUEST) — kısa/uzun basış davranışını bozmadan
+static const uint32_t DOUBLE_CLICK_WINDOW_MS = 350;
+bool     g_pendingSingleClick = false;
+uint32_t g_pendingClickMs = 0;
+
+const char* modeIdToStr(uint8_t id) {
+  switch (id) {
+    case 1: return "GUIDED";
+    case 2: return "AUTO";
+    case 3: return "LOITER";
+    case 4: return "RTL";
+    case 5: return "LAND";
+    case 6: return "STABILIZE";
+    case 7: return "MANUAL";
+    case 8: return "BRAKE";
+    case 9: return "POSHOLD";
+    default: return "UNKNOWN";
+  }
+}
+
+// onboard/state_machine.py MissionState (auto() 1'den başlar) ile eşleşir
+const char* phaseIdToStr(uint8_t id) {
+  static const char *names[] = {
+    "UNKNOWN", "IDLE", "WAIT_PACKET", "PREFLIGHT", "TAKEOFF", "NAVIGATE",
+    "SEARCH_MARKER", "PRECISION_APPROACH", "BIOMETRIC_VERIFY", "DROP_PACKAGE",
+    "RETURN_HOME", "LANDING", "DISARM", "ABORT", "MISSION_COMPLETE",
+    "FAILED", "READ_ONLY", "PILOT_OVERRIDE",
+  };
+  if (id < (sizeof(names) / sizeof(names[0]))) return names[id];
+  return "UNKNOWN";
+}
+
 // ----------------- YARDIMCI -----------------
 void beep(int ms) {
   digitalWrite(PIN_BUZZER, HIGH); digitalWrite(PIN_LED, HIGH);
@@ -149,6 +192,74 @@ void drawStatus(const char *l1, const char *l2, uint16_t) {
   Serial.printf("[STATUS] %s | %s\n", l1, l2);
 }
 #endif
+
+// Drone'dan gelen TELEMETRY paketini TFT'de 3 satırlık bilgi alanında göster.
+// drawStatus'un TX durum ekranını EZMEMESİ için ayrı bir fonksiyon; sadece
+// yeni TELEMETRY geldiğinde çağrılır (buton olayları drawStatus'u kullanmaya
+// devam eder, mevcut TX akışı bozulmaz).
+#if USE_TFT
+void drawTelemetry(const TelemetryBody &tb) {
+  tft.fillScreen(TFT_BLACK);
+  tft.setTextColor(TFT_CYAN, TFT_BLACK);
+  tft.setTextSize(2); tft.setCursor(4, 4);
+  tft.print("TELEMETRI");
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setTextSize(1);
+  tft.setCursor(4, 36);
+  tft.printf("MODE: %-10s BATT: %.1fV", modeIdToStr(tb.mode_id),
+             tb.batt_mv / 1000.0);
+  tft.setCursor(4, 54);
+  tft.printf("PHASE: %s", phaseIdToStr(tb.phase));
+  uint16_t linkColor = (tb.loss_pct > 30 || tb.rssi_dbm < -100)
+                           ? TFT_RED : TFT_GREEN;
+  tft.setTextColor(linkColor, TFT_BLACK);
+  tft.setCursor(4, 72);
+  tft.printf("RSSI: %d dBm  LOSS: %u%%", tb.rssi_dbm, tb.loss_pct);
+  tft.setTextColor(TFT_WHITE, TFT_BLACK);
+  tft.setCursor(4, 110);
+  tft.printf("seq:%u  gond:%u", g_seq, packetsSent);
+}
+#else
+void drawTelemetry(const TelemetryBody &tb) {
+  Serial.printf("[TELEMETRY] MODE:%s BATT:%.1fV PHASE:%s RSSI:%d LOSS:%u%%\n",
+                modeIdToStr(tb.mode_id), tb.batt_mv / 1000.0,
+                phaseIdToStr(tb.phase), tb.rssi_dbm, tb.loss_pct);
+}
+#endif
+
+// LoRa'dan gelen (parse + doğrulanmış) paketi işle
+void handleRxPacket(const KokpitPacket &pkt) {
+  switch (pkt.msg_type) {
+    case MSG_TELEMETRY: {
+      if (pkt.payload_len < sizeof(TelemetryBody)) break;
+      memcpy(&g_lastTelemetry, pkt.payload, sizeof(TelemetryBody));
+      g_haveTelemetry = true;
+      g_lastTelemetryMs = millis();
+      drawTelemetry(g_lastTelemetry);
+      g_alarmActive = (g_lastTelemetry.loss_pct > 30 ||
+                       g_lastTelemetry.rssi_dbm < -100);
+      break;
+    }
+    default:
+      break;   // diğer mesaj tipleri (ACK vb.) şimdilik yer istasyonunda no-op
+  }
+}
+
+// loss>30% veya rssi<-100dBm iken her ALARM_PERIOD_MS'de bir kısa beep.
+// delay() KULLANMAZ — GPS/LoRa okumalarını bloklamaz.
+void serviceAlarm() {
+  if (!g_alarmActive) return;
+  uint32_t now = millis();
+  if (now - g_lastAlarmMs >= ALARM_PERIOD_MS) {
+    g_lastAlarmMs = now;
+    digitalWrite(PIN_BUZZER, HIGH);
+    digitalWrite(PIN_LED, HIGH);
+  } else if (now - g_lastAlarmMs >= 80) {
+    // 80ms sonra buzzer'ı kapat (kısa beep), delay() olmadan
+    digitalWrite(PIN_BUZZER, LOW);
+    digitalWrite(PIN_LED, LOW);
+  }
+}
 
 void feedGps(uint32_t ms) {
   uint32_t start = millis();
@@ -396,8 +507,23 @@ void loop() {
     g_time_set = true;
   }
 
+  // ---- LoRa RX: gelen baytları protokol parser'a besle ----
+  while (LoraSerial.available()) {
+    uint8_t b = (uint8_t)LoraSerial.read();
+    KokpitPacket pkt;
+    if (g_rxParser.feed(b, &pkt)) {
+      handleRxPacket(pkt);
+    }
+  }
+  serviceAlarm();
+
+  // ---- BUTON: kısa=teslimat (DEĞİŞMEDİ), uzun=ABORT (DEĞİŞMEDİ),
+  //      çift basış=MANUAL_REQUEST (yeni) ----
+  // NOT: çift tık penceresini (350ms) yakalayabilmek için debounce eşiği
+  // 800ms'den 120ms'e indirildi; tekil buton mekanik sıçraması (<50ms tipik)
+  // hâlâ filtrelenir.
   if (digitalRead(PIN_BUTTON) == LOW &&
-      (millis() - lastButtonMs) > 800) {
+      (millis() - lastButtonMs) > 120) {
     lastButtonMs = millis();
     uint32_t pressStart = millis();
     while (digitalRead(PIN_BUTTON) == LOW) {
@@ -406,6 +532,7 @@ void loop() {
     }
     if (millis() - pressStart > 1500) {
       // UZUN BASIŞ: ABORT paketi gönder
+      g_pendingSingleClick = false;
       uint8_t buf[32];
       uint32_t s = nextSeq();
       size_t n = kokpit_pkt_build(MSG_ABORT, s, 0, 1,
@@ -413,19 +540,45 @@ void loop() {
       LoraSerial.write(buf, n); LoraSerial.flush();
       drawStatus("ABORT GONDERILDI", "", TFT_ORANGE);
       beep(40); delay(40); beep(40);
+    } else if (g_pendingSingleClick &&
+               (millis() - g_pendingClickMs) < DOUBLE_CLICK_WINDOW_MS) {
+      // ÇİFT BASIŞ: MANUAL_REQUEST("LOITER") gönder — pilot kontrolü ister
+      g_pendingSingleClick = false;
+      ManualRequestBody mb = {};
+      strncpy(mb.target_mode, "LOITER", sizeof(mb.target_mode) - 1);
+      uint8_t buf[64];
+      uint32_t s = nextSeq();
+      size_t n = kokpit_pkt_build(MSG_MANUAL_REQUEST, s, 0, 1,
+                                  (uint8_t*)&mb, sizeof(mb), buf, sizeof(buf));
+      LoraSerial.write(buf, n); LoraSerial.flush();
+      drawStatus("MANUAL TALEP", "GONDERILDI", TFT_ORANGE);
+      beep(30); delay(30); beep(30); delay(30); beep(30);
     } else {
-      drawStatus("YAKALANIYOR...", "", TFT_YELLOW);
-      sendFaceDelivery();
-      // Her gönderim sonrası img_seq'i kalıcı kaydet
-      prefs.putUInt("imgseq", g_img_seq);
+      // İlk kısa basış: hemen tetiklemiyoruz, çift tık gelebilir. Pencere
+      // aşağıda kapanınca (çift tık gelmezse) sendFaceDelivery çağrılır.
+      g_pendingSingleClick = true;
+      g_pendingClickMs = millis();
     }
   }
 
-  // 1 Hz GPS durum
+  // Tek-tık penceresi kapandı ve çift tık gelmedi → mevcut teslimat akışı
+  if (g_pendingSingleClick &&
+      (millis() - g_pendingClickMs) >= DOUBLE_CLICK_WINDOW_MS) {
+    g_pendingSingleClick = false;
+    drawStatus("YAKALANIYOR...", "", TFT_YELLOW);
+    sendFaceDelivery();
+    // Her gönderim sonrası img_seq'i kalıcı kaydet
+    prefs.putUInt("imgseq", g_img_seq);
+  }
+
+  // 1 Hz GPS durum (TELEMETRY ekranını da ezmesin diye sadece TELEMETRY
+  // yokken/eskiyse göster — basit kural: son TELEMETRY 3 sn'den eskiyse)
   static uint32_t lastUi = 0;
   if (millis() - lastUi > 1000) {
     lastUi = millis();
-    if (digitalRead(PIN_BUTTON) == HIGH) {
+    bool telemetryFresh = g_haveTelemetry &&
+                          (millis() - g_lastTelemetryMs) < 3000;
+    if (digitalRead(PIN_BUTTON) == HIGH && !telemetryFresh) {
       char l1[32], l2[32];
       if (gps.location.isValid()) {
         snprintf(l1, sizeof(l1), "GPS OK sat:%lu",
