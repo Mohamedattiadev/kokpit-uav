@@ -1,9 +1,9 @@
 # Kokpit UAV
 
 [![CI](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml/badge.svg)](https://github.com/Mohamedattiadev/kokpit-uav/actions/workflows/ci.yml)
-![tests](https://img.shields.io/badge/tests-303%20passed-brightgreen)
+![tests](https://img.shields.io/badge/tests-369%20passed-brightgreen)
 ![status](https://img.shields.io/badge/yaz%C4%B1l%C4%B1m-tamam-brightgreen)
-![donanim](https://img.shields.io/badge/donan%C4%B1m-bekleniyor-yellow)
+![donanim](https://img.shields.io/badge/donan%C4%B1m-2%2F4%20kod%20haz%C4%B1r-yellow)
 
 **Teknofest 2026 — Uluslararası İHA Yarışması, Serbest Görev Kategorisi**
 Ankara Yıldırım Beyazıt Üniversitesi · Kokpit Takımı
@@ -101,7 +101,9 @@ kokpit-uav/
 
 **Yazılım tarafı tamamlandı.**
 
-- 303 unit test geçer + 1 skip (`make test`, ~2 dk). CI yeşil (GitHub Actions).
+- 369 unit test geçer + 1 skip (`make test`, ~12 dk — gerçek dünya arıza enjeksiyon sweep'leri eklendi). CI yeşil (GitHub Actions).
+- İŞ-1 (TensorRT yüz tanıma engine build) ve İŞ-3'ün (ESP32 RX parser) **kod tarafı tamamlandı**, gerçek Jetson Orin Nano'da doğrulandı, `main`'e alındı. Detay ve kalan fiziksel adımlar → [`docs/DONANIM_PLANI.md`](docs/DONANIM_PLANI.md).
+- Gerçek-dünya arıza enjeksiyonu (rüzgar/ArUco geometri/attitude/biyometrik/sensör bozulması/çoklu-arıza) simülasyon katmanına eklendi — saha testi öncesi risk azaltma, donanımın yerini TUTMAZ.
 - Sprint 0 + Sprint 1 + Sprint 2 + Sprint 3 + M1-M12 + N1-N12 + dashboard pro tamam.
 - Simülasyonda uçtan uca otonom görev çalışır.
 - Rapor (`docs/report/884462.pdf`) uyumu: Q1-Q7 kararlar korundu, ihlal yok.
@@ -160,10 +162,10 @@ Toplam: 33 ek test (270 → 303), 7 yeni commit, ~1500 LOC dashboard + event sis
 
 **Donanım bekleyen 4 iş** (detaylı adım adım plan → [`docs/DONANIM_PLANI.md`](docs/DONANIM_PLANI.md)):
 
-1. **TensorRT engine build.** Jetson Orin Nano + JetPack 6.x kurulduğunda `tools/build_face_trt.py` çalıştırılacak. Bu yapılmazsa yüz tanıma CPU üzerinde 1-2 FPS'te kalır (dlib fallback).
-2. **Extrinsics kalibrasyon.** Kamera + lidar gövdeye monte edildikten sonra cetvelle ölçü alınıp `tools/calibrate_extrinsics.py` ile kaydedilmeli. Yapılmazsa iniş 5-10 cm kayar.
-3. **ESP32 RX parser.** Drone'dan gelen TELEMETRY paketini yer istasyonu TFT'sinde göstermek için firmware'e parser eklenecek. Saha öncesi ikinci bir firmware PR'ı.
-4. **Saha test uçuşları.** ArduCopter PID tune + manuel → stabilize → loiter → guided kademe testleri.
+1. ~~**TensorRT engine build.**~~ **Kod tarafı TAMAM** ([PR #1](https://github.com/Mohamedattiadev/kokpit-uav/pull/1)) — `tools/build_face_trt.py` TensorRT 10.x'e uyumlu hale getirildi, Jetson Orin Nano'da det/emb engine'leri gerçekten derlendi, `tests/test_face_trt.py` 6/6 PASS. **Kalan (fiziksel/sudo):** `sudo nvpmodel -m 0` + systemd servis kurulumu — bkz. checklist.
+2. **Extrinsics kalibrasyon.** Kamera + lidar gövdeye monte edildikten sonra cetvelle ölçü alınıp `tools/calibrate_extrinsics.py` ile kaydedilmeli. Yapılmazsa iniş 5-10 cm kayar. *(henüz başlanmadı — donanım montajı gerekiyor)*
+3. ~~**ESP32 RX parser.**~~ **Kod tarafı TAMAM** ([PR #1](https://github.com/Mohamedattiadev/kokpit-uav/pull/1)) — `packet_protocol.h` + `ground_station.ino`'ya TELEMETRY parser, TFT gösterimi, buzzer uyarısı ve çift-tık MANUAL_REQUEST eklendi; host-derlenmiş harness ile 7/7 PASS doğrulandı. **Kalan (fiziksel):** gerçek ESP32 kartına yükleme + saha LoRa testi.
+4. **Saha test uçuşları.** ArduCopter PID tune + manuel → stabilize → loiter → guided kademe testleri. *(henüz başlanmadı — 1-3 tamamlanmadan anlamlı değil)*
 
 ### N1-N12 sahada yapılacak (yazılım hazır, donanım/insan gerekir)
 
