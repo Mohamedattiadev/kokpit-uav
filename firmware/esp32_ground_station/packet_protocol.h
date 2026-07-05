@@ -50,6 +50,7 @@ enum KokpitMsgType : uint8_t {
   MSG_HEARTBEAT        = 5,
   MSG_TELEMETRY        = 6,
   MSG_ACK              = 7,
+  MSG_MANUAL_REQUEST   = 8,
 };
 
 // DELIVERY_REQUEST gövdesi — 21 byte
@@ -127,7 +128,198 @@ static inline bool kokpit_aes_encrypt(uint32_t seq, uint8_t msg_type,
   *out_len = pt_len + PKT_AES_TAG_LEN;
   return true;
 }
+
+// kokpit_aes_encrypt'in tersi. ct_len tag dahil şifreli uzunluk; pt_len
+// (çözülmüş) çıktısı ct_len - PKT_AES_TAG_LEN olur.
+static inline bool kokpit_aes_decrypt(uint32_t seq, uint8_t msg_type,
+                                      uint8_t chunk,
+                                      const uint8_t *ct, size_t ct_len,
+                                      uint8_t *out, size_t *pt_len) {
+  if (!g_kokpit_ccm_ready) return false;
+  if (ct_len < PKT_AES_TAG_LEN) return false;
+  uint8_t nonce[13];
+  memcpy(nonce, &seq, 4);
+  nonce[4] = msg_type;
+  nonce[5] = chunk;
+  memcpy(nonce + 6, "KOKPIT0", 7);
+  size_t data_len = ct_len - PKT_AES_TAG_LEN;
+  int rc = mbedtls_ccm_auth_decrypt(
+      &g_kokpit_ccm, data_len, nonce, 13, nullptr, 0,
+      ct, out, ct + data_len, PKT_AES_TAG_LEN);
+  if (rc != 0) return false;
+  *pt_len = data_len;
+  return true;
+}
 #endif
+
+// ---------------------------------------------------------------------------
+// TELEMETRY payload — onboard/packet_protocol.py TELEMETRY_FMT="<BHBbB" ile
+// birebir aynı: mode_id, batt_mv, phase, rssi_dbm(signed), loss_pct
+// ---------------------------------------------------------------------------
+struct __attribute__((packed)) TelemetryBody {
+  uint8_t  mode_id;
+  uint16_t batt_mv;
+  uint8_t  phase;
+  int8_t   rssi_dbm;
+  uint8_t  loss_pct;
+};
+
+// MANUAL_REQUEST payload — onboard/packet_protocol.py encode_manual_request:
+// 16 byte ascii, null-padded (örn. "LOITER")
+struct __attribute__((packed)) ManualRequestBody {
+  char target_mode[16];
+};
+
+// ---------------------------------------------------------------------------
+// Parsed paket (kokpit_pkt_build'in tersi çıktısı)
+// ---------------------------------------------------------------------------
+struct KokpitPacket {
+  uint8_t  msg_type;
+  uint32_t seq;
+  uint8_t  chunk;
+  uint8_t  total;
+  uint8_t  payload[PKT_MAX_PAYLOAD];
+  size_t   payload_len;
+};
+
+// ---------------------------------------------------------------------------
+// KokpitStreamParser — UART bayt akışından paket ayıkla (Jetson tarafındaki
+// StreamParser (onboard/packet_protocol.py) ile aynı mantık): magic resync,
+// header/CRC doğrulama, AES-CCM decrypt, SHA-256 doğrulama, son 64 seq için
+// replay koruması (LRU).
+// ---------------------------------------------------------------------------
+class KokpitStreamParser {
+ public:
+  static constexpr size_t BUF_CAP  = 300;   // >= HEADER(20)+MAX_PAYLOAD(200)+CRC(2)
+  static constexpr size_t SEEN_CAP = 64;
+
+  KokpitStreamParser() : len_(0), seen_pos_(0) {
+    for (size_t i = 0; i < SEEN_CAP; i++) seen_[i] = 0xFFFFFFFFu;
+    crc_errors = 0; sha_errors = 0; decrypt_errors = 0; replay_drops = 0;
+    bytes_dropped = 0;
+  }
+
+  // Bir bayt besle. Tam ve geçerli bir paket oluşursa true döner ve `out`
+  // doldurulur (BOOT_BEACON hariç replay kontrolünden de geçmiş olur).
+  bool feed(uint8_t b, KokpitPacket *out) {
+    if (len_ >= BUF_CAP) {
+      // taşma koruması: en eski baytı at (senkron kaybı, resync ile düzelir)
+      memmove(buf_, buf_ + 1, len_ - 1);
+      len_--;
+      bytes_dropped++;
+    }
+    buf_[len_++] = b;
+    return tryExtract(out);
+  }
+
+  uint32_t crc_errors, sha_errors, decrypt_errors, replay_drops, bytes_dropped;
+
+ private:
+  uint8_t buf_[BUF_CAP];
+  size_t  len_;
+  uint32_t seen_[SEEN_CAP];
+  size_t   seen_pos_;
+
+  void dropOne() {
+    if (len_ == 0) return;
+    memmove(buf_, buf_ + 1, len_ - 1);
+    len_--;
+    bytes_dropped++;
+  }
+
+  bool seenContains(uint32_t seq) const {
+    for (size_t i = 0; i < SEEN_CAP; i++) {
+      if (seen_[i] == seq) return true;
+    }
+    return false;
+  }
+
+  void seenAdd(uint32_t seq) {
+    seen_[seen_pos_] = seq;
+    seen_pos_ = (seen_pos_ + 1) % SEEN_CAP;
+  }
+
+  bool tryExtract(KokpitPacket *out) {
+    // Magic bulunana kadar baytları at
+    while (len_ >= 2 && !(buf_[0] == PKT_MAGIC0 && buf_[1] == PKT_MAGIC1)) {
+      dropOne();
+    }
+    if (len_ < PKT_HEADER_SIZE) return false;
+
+    uint8_t version  = buf_[2];
+    uint8_t msg_type = buf_[3];
+    uint32_t seq; memcpy(&seq, buf_ + 4, 4);
+    uint8_t chunk = buf_[8];
+    uint8_t total = buf_[9];
+    uint16_t plen; memcpy(&plen, buf_ + 10, 2);
+    const uint8_t *sha_hdr = buf_ + 12;   // 8 byte
+
+    if (plen > PKT_MAX_PAYLOAD) {
+      dropOne();
+      return false;
+    }
+    size_t frame_len = PKT_HEADER_SIZE + plen + PKT_CRC_SIZE;
+    if (len_ < frame_len) return false;   // daha fazla bayt bekle
+
+    uint16_t rx_crc; memcpy(&rx_crc, buf_ + frame_len - PKT_CRC_SIZE, 2);
+    uint16_t calc_crc = kokpit_crc16(buf_ + 2, (PKT_HEADER_SIZE - 2) + plen);
+    if (version != PKT_VERSION || rx_crc != calc_crc) {
+      dropOne();
+      crc_errors++;
+      return false;
+    }
+
+    uint8_t payload_enc[PKT_MAX_PAYLOAD];
+    memcpy(payload_enc, buf_ + PKT_HEADER_SIZE, plen);
+    uint8_t sha_hdr_copy[8];
+    memcpy(sha_hdr_copy, sha_hdr, 8);
+
+    // Frame doğrulandı → tüketiliyor (kalan baytları öne kaydır)
+    memmove(buf_, buf_ + frame_len, len_ - frame_len);
+    len_ -= frame_len;
+
+    uint8_t plaintext[PKT_MAX_PAYLOAD];
+    size_t pt_len = plen;
+#ifdef KOKPIT_AES_ENABLED
+    if (g_kokpit_ccm_ready) {
+      if (!kokpit_aes_decrypt(seq, msg_type, chunk, payload_enc, plen,
+                              plaintext, &pt_len)) {
+        decrypt_errors++;
+        return false;
+      }
+    } else {
+      memcpy(plaintext, payload_enc, plen);
+      pt_len = plen;
+    }
+#else
+    memcpy(plaintext, payload_enc, plen);
+    pt_len = plen;
+#endif
+
+    uint8_t sha_calc[8];
+    kokpit_sha256_8(plaintext, pt_len, sha_calc);
+    if (memcmp(sha_calc, sha_hdr_copy, 8) != 0) {
+      sha_errors++;
+      return false;
+    }
+
+    if (msg_type != (uint8_t)MSG_BOOT_BEACON) {
+      if (seenContains(seq)) {
+        replay_drops++;
+        return false;
+      }
+      seenAdd(seq);
+    }
+
+    out->msg_type = msg_type;
+    out->seq = seq;
+    out->chunk = chunk;
+    out->total = total;
+    out->payload_len = pt_len;
+    memcpy(out->payload, plaintext, pt_len);
+    return true;
+  }
+};
 
 // Frame builder. Returns total bytes written, 0 on error.
 // out_cap must be >= PKT_HEADER_SIZE + (pt_len + 8) + PKT_CRC_SIZE.
