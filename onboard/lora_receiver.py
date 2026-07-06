@@ -193,12 +193,17 @@ class SerialLoRaReceiver(BaseLoRaReceiver):
 
     def _loop(self):
         while self._running:
-            data = self.ser.read(256)
+            try:
+                data = self.ser.read(256)
+            except Exception:
+                # close() sırasında ser.close() ile yarışan bir okuma olabilir
+                break
             if data:
                 self._ingest(data)
 
     def close(self):
         self._running = False
+        self._t.join(timeout=1.0)
         try:
             self.ser.close()
         except Exception:

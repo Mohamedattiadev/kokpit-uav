@@ -517,14 +517,19 @@ düşer.
 2. `ardupilot/` klasöründeki 7 param dosyasını sırayla yükle:
 
 ```
-ardupilot/01_initial_setup.param      (frame class, motor count, vb.)
-ardupilot/02_radio_calibration.param  (RC channel min/max)
-ardupilot/03_battery_failsafe.param   (voltaj eşikleri)
-ardupilot/04_geofence.param           (yarışma alanı sınırı)
-ardupilot/05_compass_calibration.param
-ardupilot/06_lidar_rangefinder.param  (TFmini RNGFND1 ayarları)
-ardupilot/07_precland.param           (PRECLAND yerleşik PID)
+ardupilot/kokpit_baseline.param    (frame class, motor count, ESC, RC, EKF3)
+ardupilot/kokpit_companion.param   (TELEM2/SERIAL2 Jetson bağlantısı, 921600 baud)
+ardupilot/kokpit_failsafe.param    (batarya/link/RC/GPS failsafe eşikleri)
+ardupilot/kokpit_geofence.param    (yarışma alanı sınırı, FENCE_*)
+ardupilot/kokpit_lidar.param       (Benewake TFS20 RNGFND1 ayarları)
+ardupilot/kokpit_precland.param    (PRECLAND yerleşik hassas iniş)
+ardupilot/kokpit_servo.param       (AUX1/SERVO9 paket bırakma servo)
 ```
+
+Not: `kokpit_geofence.param` sadece FENCE özelliğini açar; alanın gerçek
+GPS köşe noktaları (`kokpit_arena.poly`) sahaya özel olduğundan repoda
+henüz yok — sahada ölçülüp Mission Planner'ın Flight Plan → Polygon
+aracıyla ayrıca oluşturulmalı.
 
 3. Her yükleme sonrası **Write Params** + Pixhawk reboot
 
@@ -572,7 +577,8 @@ ADIM 6 — Otonom görev (yazılım entry point)
 Eğer Adım 3'te osilasyon varsa veya kontrol gevşek hissedilirse:
 
 1. Mission Planner > CONFIG > Extended Tuning
-2. AUTOTUNE channel atama (RC7 önerilen)
+2. AUTOTUNE channel atama (**RC7 kullanma** — RC7 aşağıda MOTOR KILL
+   anahtarı olarak ayrılmış; RC6 gibi boş bir kola ata)
 3. LOITER'da kalkış → AUTOTUNE switch → 5-10 dk uçuş
 4. AUTOTUNE bitince LAND, Save Params
 
@@ -594,7 +600,7 @@ Eğer Adım 3'te osilasyon varsa veya kontrol gevşek hissedilirse:
 | GPS fix yok | Anten konumu | RC + GPS antenleri ayrı kollara |
 | LOITER'da sürüklenme | GPS hatası yüksek | HDOP < 1.5 bekle, EKF reset |
 | Otonom takeoff başlamıyor | Pre-arm fail | `STATUSTEXT` mesajını oku |
-| Servo paket bırakmıyor | PWM eşiği yanlış | `SERVO9_FUNCTION=0 SERVO9_MIN=1100 MAX=1900` |
+| Servo paket bırakmıyor | PWM eşiği yanlış | `SERVO9_FUNCTION=0 SERVO9_MIN=1000 MAX=2000` (bkz. `ardupilot/kokpit_servo.param`) |
 
 ---
 
