@@ -10,6 +10,28 @@
 > aşağıdaki 4 işin hiçbirinde artık kod yazmaya gerek yok — hepsi elle,
 > fiziksel olarak yapılacak işler (kablo bağlama, ölçüm alma, ekranda bir
 > yere tıklama, drone'u uçurma gibi).
+>
+> **Kolaylık:** İŞ-1, İŞ-2, İŞ-3 (paket testi) ve İŞ-4 (param yükleme)
+> için artık **tek komutla çalışan scriptler** var (`scripts/` ve
+> `tools/` klasörlerinde) — Mission Planner'da tıklaya tıklaya dosya
+> yüklemek veya elle paket saymak yerine tek satır komut çalıştırıp
+> soruları cevaplaman yeterli. Her bölümde en üstte bu komut var; script
+> bir sebeple çalışmazsa hemen altında "elle yapılış" yedek yöntemi de
+> duruyor. Fiziksel hareket gerektiren şeyler (drone'u 6 pozisyonda
+> tutmak, döndürmek, uçurmak, Arduino IDE'den USB ile firmware yüklemek)
+> doğası gereği otomatikleştirilemez — o kısımlar hâlâ elle yapılıyor.
+> Scriptlerin kendisi de çalışırken bunu ekrana hatırlatır (hangi kısmı
+> kendisi yaptığını, hangi kısmın hâlâ senin elinle yapılması gerektiğini
+> söyler).
+>
+> **Hangisi otomatik, hangisi elle — kısa özet:**
+>
+> | Script | Ne otomatikleşti | Hâlâ elle/fiziksel olan |
+> |---|---|---|
+> | `is1_jetson_kurulum.sh` | Her şey — bu işin fiziksel tarafı yok | — |
+> | `is2_extrinsics_kalibrasyon.sh` | Değerleri dosyaya yazma + doğrulama | Şerit metreyle ölçmek |
+> | `lora_paket_testi.py` | Paket sayma + kayıp hesabı | Kabloyu takmak, butona basmak |
+> | `param_yukle.py` | 7 dosyayı yükleme + reboot | Kalibrasyon/uçuş (drone'u elle döndürmek/uçurmak) |
 
 ---
 
@@ -95,10 +117,40 @@ yavaş kalır. İkinci adım da, Jetson her yeniden başladığında görev
 yazılımının **kendiliğinden** çalışmasını sağlıyor — yoksa her seferinde
 elle başlatman gerekir.
 
-### Adım 1 — Jetson'ı tam güç moduna al
+### Tek komutla otomatik kurulum (önerilen)
 
 Jetson'a bağlan (klavye+monitör ile veya SSH ile uzaktan), terminali aç ve
-şu üç satırı **sırayla** yapıştır, her birinden sonra Enter'a bas:
+tek bu satırı yapıştır:
+
+```bash
+bash scripts/is1_jetson_kurulum.sh
+```
+
+Bu script sırayla:
+1. Jetson'ı tam güç moduna alır (`nvpmodel -m 0` + `jetson_clocks`)
+2. Repo'nun bulunduğu gerçek klasörü **kendisi otomatik bulur** ve
+   `systemd/kokpit-mc.service` dosyasındaki iki yolu (WorkingDirectory +
+   ExecStart) buna göre kendisi doldurur — elle dosya açıp düzenlemene
+   gerek yok
+3. Servisi kurar, "her açılışta otomatik başlat" olarak işaretler, hemen
+   başlatır
+4. Çalıştığını kendisi kontrol eder ve son logları ekrana basar
+
+Script sırasında sadece **iki şey** senden istenir: başlamadan önce
+Enter'a basman, ve `sudo` şifreni girmen (ekranda görünmez, normal — yazıp
+Enter'a bas). Script biterken "İŞ-1 TAMAM" yazarsa her şey yolunda demektir.
+
+Canlı logları izlemek istersen (script bittikten sonra, istersen):
+```bash
+journalctl -u kokpit-mc -f
+```
+(Durdurmak için Ctrl+C.) `WATCHDOG=1` yazan satırlar ve LoRa paket logları
+görüyorsan her şey yolunda demektir.
+
+<details>
+<summary>Script çalışmazsa — elle yapılış (yedek yöntem)</summary>
+
+### Adım 1 — Jetson'ı tam güç moduna al
 
 ```bash
 sudo nvpmodel -m 0        # Jetson'ı "MAXN" (tam güç) moduna geçirir
@@ -106,17 +158,22 @@ sudo jetson_clocks        # işlemci/GPU hızını sabit en yükseğe kilitler
 nvpmodel -q                # kontrol: ekrana "MAXN" veya "15W" yazmalı
 ```
 
-`sudo` yazınca şifre soracak — Jetson'ın kullanıcı şifresini gir (ekranda
-görünmez, normal, yazıp Enter'a bas).
-
 ### Adım 2 — Görev yazılımının otomatik başlamasını sağla
 
-Önce şu dosyayı aç ve içindeki bir satırı kontrol et:
-`systemd/kokpit-mc.service`. İçinde `WorkingDirectory=/opt/kokpit-uav`
-diye bir satır var — eğer repo Jetson'da farklı bir klasördeyse (örneğin
-`/home/kokpit/kokpit-uav`), bu satırı o gerçek yolla değiştir.
+`systemd/kokpit-mc.service` dosyasında **iki tane** yol var, ikisini de
+kendi repo yoluna göre düzelt:
 
-Sonra terminalde (kendi repo yolunu `<repo-yolu>` yerine yaz):
+```
+WorkingDirectory=<repo-yolu>
+ExecStart=<repo-yolu>/.venv/bin/python3 -m onboard.mission
+```
+
+**İkisini de** değiştir — sadece `WorkingDirectory`'yi değiştirip
+`ExecStart`'ı unutmak servisin hata vermesine sebep olur (`python3: No
+module named 'pymavlink'` gibi), çünkü `ExecStart` mutlaka
+`.venv/bin/python3`'ü göstermeli — sistemin genel `python3`'ünde
+(`/usr/bin/python3`) proje kütüphaneleri (pymavlink, opencv, numpy...)
+kurulu değil.
 
 ```bash
 cd <repo-yolu>
@@ -125,19 +182,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now kokpit-mc
 ```
 
-Bu dört satır sırasıyla: servis dosyasını sisteme kopyalar → sistemin yeni
-servisi tanımasını sağlar → servisi "her açılışta otomatik başlat" olarak
-işaretler → hemen şimdi başlatır.
-
 ### Adım 3 — Çalıştığını kontrol et
 
 ```bash
+systemctl status kokpit-mc
 journalctl -u kokpit-mc -f
 ```
-
-Bu komut, servisin canlı loglarını ekrana akıtır (durdurmak için Ctrl+C).
-`WATCHDOG=1` yazan satırlar ve LoRa paket logları görüyorsan her şey
-yolunda demektir.
+</details>
 
 ### Bitti mi, kontrol listesi:
 
@@ -214,37 +265,32 @@ Aynı mantık, bu sefer lidar'ın ışın çıkış noktasına göre:
 | `lidar.y` | Sağa/sola kayma (m) |
 | `lidar.z` | Lidar'ın aşağı mesafesi (m) |
 
-### Adım 4 — Ölçtüğün değerleri yazılıma gir
+### Adım 4 — Ölçtüğün değerleri yazılıma gir (tek komut, otomatik doğrulamalı)
 
-Jetson'da terminal aç:
-
-```bash
-cd <repo-yolu>
-source .venv/bin/activate
-python3 tools/calibrate_extrinsics.py
-```
-
-Bu programı çalıştırınca sana sırayla `CAM x`, `CAM y`, `CAM z` ve
-`LIDAR x`, `LIDAR y`, `LIDAR z` diye soracak — yukarıda kağıda yazdığın
-değerleri (metre cinsinden, nokta kullanarak, virgül değil — örn. `0.10`)
-sırasıyla gir ve Enter'a bas. Program bitince
-`onboard/configs/extrinsics.yaml` adında bir dosya oluşturacak; bu dosya
-girdiğin ölçüleri kalıcı olarak saklar.
-
-### Adım 5 — Doğru girildiğini kontrol et
+Jetson'da terminal aç ve tek bu satırı çalıştır:
 
 ```bash
-cat onboard/configs/extrinsics.yaml
+bash scripts/is2_extrinsics_kalibrasyon.sh
 ```
 
-Ekrana az önce girdiğin sayıları görmelisin. Sonra:
+Bu script sana sırayla 12 soru soracak: önce `CAM x`, `CAM y`, `CAM z`,
+`CAM roll deg`, `CAM pitch deg`, `CAM yaw deg`, sonra aynı sırayla
+`LIDAR x`, `LIDAR y`, `LIDAR z`, `LIDAR roll deg`, `LIDAR pitch deg`,
+`LIDAR yaw deg`. Her soruda köşeli parantez içinde bir **varsayılan değer**
+gösterilir (örn. `CAM x (ileri) [0.0]:`) — yukarıda kağıda yazdığın ölçüyü
+gir; kamera/lidar hiç eğik değilse (çoğu montajda böyledir) `roll/pitch/yaw`
+sorularında hiçbir şey yazmadan sadece Enter'a basarak varsayılanı (`0.0`)
+kabul edebilirsin. Değerleri metre cinsinden, nokta kullanarak gir (virgül
+değil — örn. `0.10`).
 
-```bash
-KOKPIT_SIM=1 pytest tests/test_extrinsics.py -v
-```
+Tüm sorular bitince script **kendisi otomatik olarak** şunları da yapar:
+- Girdiğin değerleri `onboard/configs/extrinsics.yaml` dosyasına kalıcı
+  olarak yazar
+- Doğrulama testlerini çalıştırır ve sonucu ekrana basar
+- En sonda yazdığın tüm değerleri özet olarak gösterir
 
-Bu komut, dosyanın doğru okunup okunmadığını otomatik kontrol eder — hepsi
-"PASSED" (geçti) yazmalı.
+Ekranda **"İŞ-2 TAMAM — tüm testler PASSED"** yazısını görürsen bu iş
+bitmiştir, başka bir şey yapmana gerek yok.
 
 ### Bitti mi, kontrol listesi:
 
@@ -289,18 +335,25 @@ bilgisayara bağla, Arduino IDE'de doğru kartı/portu seç, ve
 `firmware/esp32_ground_station/ground_station.ino` dosyasını aç →
 "Upload" (yükle) butonuna bas.
 
-### Adım 2 — Gerçek LoRa üzerinden 100 paketlik test
+### Adım 2 — Gerçek LoRa üzerinden paket testi (tek komut, otomatik sayar)
 
-Jetson tarafında görev yazılımını çalıştır (veya sadece LoRa gönderici
-kısmını test moduna al), yer istasyonundaki butona 100 kere bas (veya
-otomatik test paketleri gönder) ve kaç tanesinin karşıya ulaştığını say.
+Elle "kaç paket ulaştı" saymak yerine, Jetson'da terminal aç ve tek bu
+satırı çalıştır (LoRa alıcısı Jetson'a USB/UART ile bağlıyken):
+
+```bash
+python3 tools/lora_paket_testi.py
+```
+
+Script sana bağlı portu seçtirir (bulduğu portları numaralı liste olarak
+gösterir, genelde `1` yeterli), sonra "Basmayı bitirince Enter'a bas"
+der — sen yer istasyonundaki butona istediğin kadar bas (öneri: 100 kere),
+bitirince terminale dönüp Enter'a bas. Script ulaşan paket sayısını, kayıp
+sayısını ve kayıp yüzdesini **kendisi hesaplayıp** ekrana basar; ayrıca
+kayıp %30'un üzerindeyse veya hiç paket gelmediyse ne kontrol etmen
+gerektiğini de Türkçe olarak söyler (anten, kanal/adres ayarı, GPS fix vb.).
 
 - Hedef: kayıp neredeyse sıfır olmalı (kablosuz olduğu için sıfır'a çok
   yakın kayıp normaldir).
-- Sürekli %30'dan fazla paket kaybediyorsa: anten bağlantısını kontrol et,
-  mesafeyi azalt, ya da aradaki engelleri (metal, duvar) kaldır. (Zaten
-  sinyal kötüyse ekrandaki buzzer otomatik uyarı verecek — bunu da bu
-  testte duyup duymadığını kontrol et.)
 
 ### Adım 3 — Ekranın okunabilirliğini kontrol et
 
@@ -331,26 +384,51 @@ uçuş testleri).
 **Önkoşul — bunlar bitmeden BAŞLAMA:** İŞ-1, İŞ-2, İŞ-3 tamamlanmış olmalı;
 drone'un montajı tam bitmiş olmalı; batarya dolu olmalı.
 
-### Adım 1 — Ayar (parametre) dosyalarını yükle
+### Adım 1 — Ayar (parametre) dosyalarını yükle (tek komut, otomatik)
 
-Mission Planner programını aç, Pixhawk'a bağlan. Üstteki menüden
-**CONFIG → Full Parameter Tree** kısmına git. Repo içindeki `ardupilot/`
-klasöründe 7 tane hazır ayar dosyası var — bunları **sırasıyla**, birini
-bitirip diğerine geçerek yükle:
+Mission Planner'da 7 dosyayı tek tek "Load from file" + "Write Params" ile
+yüklemek yerine, Pixhawk'ı Jetson'a USB veya TELEM kablosuyla bağlayıp tek
+bu komutu çalıştırabilirsin:
 
-```
-1. 01_initial_setup.param       → drone tipini, motor sayısını ayarlar
-2. 02_radio_calibration.param   → kumandanın min/max değerlerini ayarlar
-3. 03_battery_failsafe.param    → batarya azalınca ne olacağını ayarlar
-4. 04_geofence.param            → yarışma alanının sınırını ayarlar
-5. 05_compass_calibration.param → pusula ayarları
-6. 06_lidar_rangefinder.param   → mesafe sensörü ayarları
-7. 07_precland.param            → hassas iniş ayarları
+```bash
+cd <repo-yolu>
+.venv/bin/python3 tools/param_yukle.py
 ```
 
-**Her dosyayı yükledikten sonra mutlaka "Write Params" butonuna bas** ve
-Pixhawk'ı yeniden başlat (reboot) — aksi halde ayar kalıcı olarak
-kaydolmaz.
+Script sırayla:
+1. Bulduğu bağlantı portlarını numaralı liste olarak gösterir (USB mi
+   TELEM mi bağlı olduğunu sorar, sonra port seçtirir)
+2. Pixhawk'a MAVLink üzerinden bağlanır
+3. `ardupilot/` klasöründeki 7 dosyayı **doğru sırada, kendisi** yükler:
+   `kokpit_baseline.param` (frame/motor/EKF3) → `kokpit_companion.param`
+   (Jetson bağlantısı) → `kokpit_failsafe.param` (batarya/link/RC/GPS) →
+   `kokpit_geofence.param` (alan sınırı) → `kokpit_lidar.param` (mesafe
+   sensörü) → `kokpit_precland.param` (hassas iniş) → `kokpit_servo.param`
+   (paket bırakma servosu)
+4. Sonunda "Pixhawk'ı yeniden başlatayım mı?" diye sorar — Enter'a basman
+   yeterli, gerekli reboot'u kendisi yapar
+
+Bu 7 dosya bu Jetson'da gerçek bir ArduCopter SITL'ine karşı bizzat test
+edilip doğrulanmıştır (7/7 başarıyla yüklendi).
+
+**Not — geofence polygon ayrı yüklenir:** `kokpit_geofence.param` sadece
+sınır özelliğini açar (`FENCE_ENABLE`, `FENCE_ACTION=RTL` vb.); yarışma
+alanının **gerçek köşe noktaları** (`kokpit_arena.poly`) sahaya özel
+olduğu için repoda henüz yok — sahada GPS ile alanın köşelerini gezip
+Mission Planner'ın **Flight Plan → Polygon** aracıyla ayrıca çizip
+Pixhawk'a yüklemen gerekiyor (bu kısım GPS ile sahada gezmeyi gerektirdiği
+için otomatikleştirilemez).
+
+<details>
+<summary>Script çalışmazsa — Mission Planner ile elle yükleme (yedek yöntem)</summary>
+
+Mission Planner programını aç, Pixhawk'a bağlan. **CONFIG → Full
+Parameter Tree** kısmına git ve 7 dosyayı yukarıdaki sırayla, birini
+bitirip diğerine geçerek yükle. **Her dosyayı yükledikten sonra mutlaka
+"Write Params" butonuna bas** ve Pixhawk'ı yeniden başlat (reboot) — aksi
+halde ayar kalıcı olarak kaydolmaz. Dosya adları `ardupilot/README.md`'de
+de aynı şekilde listelidir.
+</details>
 
 ### Adım 2 — Kalibrasyon turu (uçmadan önce zorunlu)
 
@@ -414,10 +492,14 @@ düşmesini önler.
 ### Adım 4 — Gerekirse PID ayarı (Auto-Tune)
 
 Eğer 3. adımdaki testlerde drone titriyor, sallanıyor veya kontrolü gevşek
-hissediliyorsa: Mission Planner'da Extended Tuning ekranından bir kumanda
-koluna (genelde RC7) AUTOTUNE atarsın, LOITER modunda kalkış yapıp o
-kolu açarsın, drone 5-10 dakika kendi kendine ince ayar yapar, bitince
-LAND yapıp ayarları kaydedersin (Save Params).
+hissediliyorsa: Mission Planner'da Extended Tuning ekranından **RC7 DIŞINDA
+boş bir kumanda koluna** (örneğin RC6) AUTOTUNE atarsın, LOITER modunda
+kalkış yapıp o kolu açarsın, drone 5-10 dakika kendi kendine ince ayar
+yapar, bitince LAND yapıp ayarları kaydedersin (Save Params).
+**RC7'yi kullanma** — o kanal aşağıdaki "Acil Durum Kuralları" bölümünde
+MOTOR KILL anahtarı olarak ayrılmıştır; aynı kola iki farklı fonksiyon
+atarsan acil durumda motoru kilitlemek yerine yanlışlıkla autotune
+tetiklenebilir.
 
 ### Bitti mi, kontrol listesi:
 
@@ -437,7 +519,7 @@ LAND yapıp ayarları kaydedersin (Save Params).
 | GPS sinyali bulamıyor | Anten yanlış yerde | GPS anteniyle RC/telemetri antenini farklı kollara ayır |
 | LOITER modunda sürükleniyor | GPS sinyali zayıf (yüksek HDOP) | GPS sinyali güçlenene kadar bekle, gerekirse EKF'yi sıfırla |
 | Otonom kalkış başlamıyor | Pre-arm (kalkış öncesi) kontrol hatası | Mission Planner'daki "STATUSTEXT" mesaj kutusunu oku, hangi kontrolün başarısız olduğu orada yazar |
-| Servo paketi bırakmıyor | Servo ayarı yanlış | `SERVO9_FUNCTION=0`, `SERVO9_MIN=1100`, `SERVO9_MAX=1900` parametrelerini kontrol et |
+| Servo paketi bırakmıyor | Servo ayarı yanlış | `SERVO9_FUNCTION=0`, `SERVO9_MIN=1000`, `SERVO9_MAX=2000` parametrelerini kontrol et (bkz. `ardupilot/kokpit_servo.param`) |
 
 ---
 
@@ -459,7 +541,7 @@ Pilot HER ZAMAN elindeki kumandayla anında kontrolü geri alabilir.
 - [ ] Manual, Stabilize, Loiter, Guided modlarının hepsi test edildi
 - [ ] Geofence (alan sınırı) yüklü ve aktif
 - [ ] Telemetri bağlantısı ve RC (kumanda) bağlantısı kontrol edildi
-- [ ] Rüzgar 5 m/s'nin altında, yağmur yok (`tools/weather_check.py` ile kontrol edilebilir)
+- [ ] Rüzgar 5 m/s'nin altında, yağmur yok — `python3 tools/weather_check.py --lat <enlem> --lon <boylam>` ile kontrol edilebilir (`--lat`/`--lon` zorunlu, uçuş alanının gerçek koordinatlarını yaz)
 - [ ] Drone'un 100 metre çevresinde izleyici/başka insan yok
 - [ ] Yangın söndürücü elinizin altında
 - [ ] Pilot lisanslı/sertifikalı ve dinlenmiş (yorgun pilot uçurmasın)
@@ -479,12 +561,12 @@ Pilot HER ZAMAN elindeki kumandayla anında kontrolü geri alabilir.
 
 ## Özet Tablo — Şu An Ne Kaldı?
 
-| İş | Kod durumu | Kalan iş | Kim |
-|---|---|---|---|
-| İŞ-1 TensorRT | ✅ Bitti | 2 terminal komutu (~15 dk) | Sistem sorumlusu |
-| İŞ-2 Extrinsics | — (kod gerekmiyor) | Ölçüm + kalibrasyon aracı çalıştırma (1-2 saat) | Mekanik + elektronik |
-| İŞ-3 ESP32 | ✅ Bitti | Karta yükleme + saha radyo testi (yarım gün) | Elektronik/firmware |
-| İŞ-4 Uçuş testleri | — (kod gerekmiyor) | Param yükleme + kademeli test uçuşları (2 gün) | Zeki Emir + takım |
+| İş | Kod durumu | Kalan iş | Tek komut | Kim |
+|---|---|---|---|---|
+| İŞ-1 TensorRT | ✅ Bitti | `bash scripts/is1_jetson_kurulum.sh` (~15 dk) | ✅ tam otomatik | Sistem sorumlusu |
+| İŞ-2 Extrinsics | — (kod gerekmiyor) | Ölçüm (fiziksel, 1-2 saat) + `bash scripts/is2_extrinsics_kalibrasyon.sh` | ✅ girişten sonra otomatik | Mekanik + elektronik |
+| İŞ-3 ESP32 | ✅ Bitti | Karta yükleme (Arduino IDE, elle) + `python3 tools/lora_paket_testi.py` (paket sayımı otomatik) | Yarı otomatik | Elektronik/firmware |
+| İŞ-4 Uçuş testleri | — (kod gerekmiyor) | `.venv/bin/python3 tools/param_yukle.py` (otomatik) + kalibrasyon/uçuş (fiziksel, elle) | Yarı otomatik | Zeki Emir + takım |
 
 Daha fazla detay, tüm komutlar ve genişletilmiş sorun giderme tabloları:
 [`docs/DONANIM_PLANI.md`](DONANIM_PLANI.md).

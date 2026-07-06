@@ -59,7 +59,7 @@ class PreflightCheck:
     # ardupilot/kokpit_baseline.param sha256 — değişirse param değişti demektir
     # Yeni hash hesaplama: sha256sum ardupilot/kokpit_baseline.param
     EXPECTED_PARAM_HASH: Optional[str] = (
-        "9cf9f7983be1bfd24c29070e67009aa3ade1d4b3e2f493afa3d240eaefe2a431"
+        "b40eabc211c6666ad7330587fb5751ae76821b6e0ba960f4d4c92186413bbc20"
     )
 
     def __init__(self,
