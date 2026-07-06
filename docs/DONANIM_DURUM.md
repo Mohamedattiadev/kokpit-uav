@@ -123,7 +123,7 @@ Jetson'a bağlan (klavye+monitör ile veya SSH ile uzaktan), terminali aç ve
 tek bu satırı yapıştır:
 
 ```bash
-bash scripts/is1_jetson_kurulum.sh
+bash ~/Teknofest/scripts/is1_jetson_kurulum.sh
 ```
 
 Bu script sırayla:
@@ -161,11 +161,11 @@ nvpmodel -q                # kontrol: ekrana "MAXN" veya "15W" yazmalı
 ### Adım 2 — Görev yazılımının otomatik başlamasını sağla
 
 `systemd/kokpit-mc.service` dosyasında **iki tane** yol var, ikisini de
-kendi repo yoluna göre düzelt:
+kendi repo yoluna göre düzelt (bu Jetson'da repo `~/Teknofest`'te, örnek):
 
 ```
-WorkingDirectory=<repo-yolu>
-ExecStart=<repo-yolu>/.venv/bin/python3 -m onboard.mission
+WorkingDirectory=/home/jetson/Teknofest
+ExecStart=/home/jetson/Teknofest/.venv/bin/python3 -m onboard.mission
 ```
 
 **İkisini de** değiştir — sadece `WorkingDirectory`'yi değiştirip
@@ -173,11 +173,11 @@ ExecStart=<repo-yolu>/.venv/bin/python3 -m onboard.mission
 module named 'pymavlink'` gibi), çünkü `ExecStart` mutlaka
 `.venv/bin/python3`'ü göstermeli — sistemin genel `python3`'ünde
 (`/usr/bin/python3`) proje kütüphaneleri (pymavlink, opencv, numpy...)
-kurulu değil.
+kurulu değil. Kendi Jetson'ında repo başka bir klasördeyse (örneğin
+`/home/kokpit/kokpit-uav`), yukarıdaki iki satırı o gerçek yolla değiştir.
 
 ```bash
-cd <repo-yolu>
-sudo cp systemd/kokpit-mc.service /etc/systemd/system/
+sudo cp ~/Teknofest/systemd/kokpit-mc.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl enable --now kokpit-mc
 ```
@@ -270,7 +270,7 @@ Aynı mantık, bu sefer lidar'ın ışın çıkış noktasına göre:
 Jetson'da terminal aç ve tek bu satırı çalıştır:
 
 ```bash
-bash scripts/is2_extrinsics_kalibrasyon.sh
+bash ~/Teknofest/scripts/is2_extrinsics_kalibrasyon.sh
 ```
 
 Bu script sana sırayla 12 soru soracak: önce `CAM x`, `CAM y`, `CAM z`,
@@ -341,7 +341,7 @@ Elle "kaç paket ulaştı" saymak yerine, Jetson'da terminal aç ve tek bu
 satırı çalıştır (LoRa alıcısı Jetson'a USB/UART ile bağlıyken):
 
 ```bash
-python3 tools/lora_paket_testi.py
+~/Teknofest/.venv/bin/python3 ~/Teknofest/tools/lora_paket_testi.py
 ```
 
 Script sana bağlı portu seçtirir (bulduğu portları numaralı liste olarak
@@ -391,8 +391,7 @@ yüklemek yerine, Pixhawk'ı Jetson'a USB veya TELEM kablosuyla bağlayıp tek
 bu komutu çalıştırabilirsin:
 
 ```bash
-cd <repo-yolu>
-.venv/bin/python3 tools/param_yukle.py
+~/Teknofest/.venv/bin/python3 ~/Teknofest/tools/param_yukle.py
 ```
 
 Script sırayla:
@@ -541,7 +540,7 @@ Pilot HER ZAMAN elindeki kumandayla anında kontrolü geri alabilir.
 - [ ] Manual, Stabilize, Loiter, Guided modlarının hepsi test edildi
 - [ ] Geofence (alan sınırı) yüklü ve aktif
 - [ ] Telemetri bağlantısı ve RC (kumanda) bağlantısı kontrol edildi
-- [ ] Rüzgar 5 m/s'nin altında, yağmur yok — `python3 tools/weather_check.py --lat <enlem> --lon <boylam>` ile kontrol edilebilir (`--lat`/`--lon` zorunlu, uçuş alanının gerçek koordinatlarını yaz)
+- [ ] Rüzgar 5 m/s'nin altında, yağmur yok — `~/Teknofest/.venv/bin/python3 ~/Teknofest/tools/weather_check.py --lat <enlem> --lon <boylam>` ile kontrol edilebilir (`--lat`/`--lon` zorunlu, uçuş alanının gerçek koordinatlarını yaz)
 - [ ] Drone'un 100 metre çevresinde izleyici/başka insan yok
 - [ ] Yangın söndürücü elinizin altında
 - [ ] Pilot lisanslı/sertifikalı ve dinlenmiş (yorgun pilot uçurmasın)
@@ -563,10 +562,10 @@ Pilot HER ZAMAN elindeki kumandayla anında kontrolü geri alabilir.
 
 | İş | Kod durumu | Kalan iş | Tek komut | Kim |
 |---|---|---|---|---|
-| İŞ-1 TensorRT | ✅ Bitti | `bash scripts/is1_jetson_kurulum.sh` (~15 dk) | ✅ tam otomatik | Sistem sorumlusu |
-| İŞ-2 Extrinsics | — (kod gerekmiyor) | Ölçüm (fiziksel, 1-2 saat) + `bash scripts/is2_extrinsics_kalibrasyon.sh` | ✅ girişten sonra otomatik | Mekanik + elektronik |
-| İŞ-3 ESP32 | ✅ Bitti | Karta yükleme (Arduino IDE, elle) + `python3 tools/lora_paket_testi.py` (paket sayımı otomatik) | Yarı otomatik | Elektronik/firmware |
-| İŞ-4 Uçuş testleri | — (kod gerekmiyor) | `.venv/bin/python3 tools/param_yukle.py` (otomatik) + kalibrasyon/uçuş (fiziksel, elle) | Yarı otomatik | Zeki Emir + takım |
+| İŞ-1 TensorRT | ✅ Bitti | `bash ~/Teknofest/scripts/is1_jetson_kurulum.sh` (~15 dk) | ✅ tam otomatik | Sistem sorumlusu |
+| İŞ-2 Extrinsics | — (kod gerekmiyor) | Ölçüm (fiziksel, 1-2 saat) + `bash ~/Teknofest/scripts/is2_extrinsics_kalibrasyon.sh` | ✅ girişten sonra otomatik | Mekanik + elektronik |
+| İŞ-3 ESP32 | ✅ Bitti | Karta yükleme (Arduino IDE, elle) + `~/Teknofest/.venv/bin/python3 ~/Teknofest/tools/lora_paket_testi.py` (paket sayımı otomatik) | Yarı otomatik | Elektronik/firmware |
+| İŞ-4 Uçuş testleri | — (kod gerekmiyor) | `~/Teknofest/.venv/bin/python3 ~/Teknofest/tools/param_yukle.py` (otomatik) + kalibrasyon/uçuş (fiziksel, elle) | Yarı otomatik | Zeki Emir + takım |
 
 Daha fazla detay, tüm komutlar ve genişletilmiş sorun giderme tabloları:
 [`docs/DONANIM_PLANI.md`](DONANIM_PLANI.md).
