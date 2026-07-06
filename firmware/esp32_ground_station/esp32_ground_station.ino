@@ -1,5 +1,5 @@
 /*
- * ground_station.ino — Kokpit Yer İstasyonu (Ped) — ESP32 / TTGO T-Display (v2)
+ * esp32_ground_station.ino — Kokpit Yer İstasyonu (Ped) — ESP32 / TTGO T-Display (v2)
  * Sorumlu: Attia (+ Arda, Zeki ile ortak protokol)
  *
  * GÖREV (rapor 3.3.1.1 — FACE IMAGE CAPTURE → packet → drone):
@@ -35,6 +35,7 @@
 #include <Preferences.h>
 #include <sys/time.h>
 #include <time.h>
+#include "esp_mac.h"     // esp_efuse_mac_get_default() — yeni ESP-IDF'te Arduino.h ile gelmiyor
 #include "packet_protocol.h"
 
 // ----------------- DERLEME SEÇENEKLERİ -----------------
