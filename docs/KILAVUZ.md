@@ -107,7 +107,7 @@ cd sitl && KOKPIT_SIM=1 python3 software_demo.py
 1. Arduino IDE → **ESP32 board paketi** kur (Boards Manager → "esp32").
 2. Library Manager → **TinyGPSPlus** ve **TFT_eSPI** kur.
 3. TTGO T-Display için TFT_eSPI `User_Setup_Select.h` içinde TTGO profilini seç.
-4. `firmware/esp32_ground_station/ground_station.ino` ve `packet_protocol.h` aynı klasörde olsun.
+4. `firmware/esp32_ground_station/esp32_ground_station.ino` ve `packet_protocol.h` aynı klasörde olsun (dosya adı klasör adıyla aynı olmak zorunda — Arduino kuralı).
 5. Board = "TTGO LoRa32 / ESP32 Dev Module", doğru COM portu → **Upload**.
 
 ---

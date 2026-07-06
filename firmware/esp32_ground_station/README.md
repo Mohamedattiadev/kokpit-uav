@@ -7,16 +7,31 @@ seçer, fiziksel buton ile tetiklenince GPS + alıcı kimliğini CRC'li tek pake
 birleştirir ve LoRa E32 ile İHA'ya gönderir (rapor 3.3.1.1).
 
 ## Dosyalar
-- `ground_station.ino` — ESP32 ana programı (Arduino).
+- `esp32_ground_station.ino` — ESP32 ana programı (Arduino). Dosya adı klasör
+  adıyla aynı olmak zorunda (Arduino kuralı) — `arduino-cli`/Arduino IDE
+  aksi halde sketch'i açamaz.
 - `packet_protocol.h` — İHA tarafı `onboard/packet_protocol.py` ile **birebir** aynı
   paket biçimi (CRC-16/CCITT, little-endian). Biri değişirse diğeri de değişmeli.
 
 ## Gerekli kütüphaneler (Arduino Library Manager)
-- **TinyGPSPlus** (Mikal Hart) — GPS NMEA ayrıştırma
-- **TFT_eSPI** (Bodmer) — TTGO T-Display ekran (`USE_TFT 1` ise). `User_Setup`'ta
-  TTGO T-Display profili seçili olmalı.
 
-## Örnek kablolama (kendi pinlerine göre `ground_station.ino` başında güncelle)
+Versiyonlar bilerek sabitlendi — Library Manager güncellemesi sessizce
+derleme hatası veya farklı davranışa yol açmasın diye (`AUDIT_GUCLENDIRMELER.md`
+madde 12). Kurulumda **"Install specific version"** seçip aşağıdaki
+sürümleri seç:
+
+- **TinyGPSPlus** (Mikal Hart) — **v1.0.3** — GPS NMEA ayrıştırma
+- **TFT_eSPI** (Bodmer) — **v2.5.43** — TTGO T-Display ekran (`USE_TFT 1` ise).
+  `User_Setup`'ta TTGO T-Display profili seçili olmalı.
+
+PlatformIO kullananlar için `platformio.ini`'de eşdeğeri:
+```ini
+lib_deps =
+    mikalhart/TinyGPSPlus@1.0.3
+    bodmer/TFT_eSPI@2.5.43
+```
+
+## Örnek kablolama (kendi pinlerine göre `esp32_ground_station.ino` başında güncelle)
 
 | Modül | Sinyal | ESP32 Pin |
 |------|--------|-----------|

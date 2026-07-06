@@ -332,7 +332,7 @@ Bilgisayarına Arduino IDE (veya PlatformIO) kurulu olmalı. Gerekli
 kütüphanelerin listesi `firmware/esp32_ground_station/README.md`
 dosyasında yazıyor — önce onları kur. Sonra ESP32 kartını USB kabloyla
 bilgisayara bağla, Arduino IDE'de doğru kartı/portu seç, ve
-`firmware/esp32_ground_station/ground_station.ino` dosyasını aç →
+`firmware/esp32_ground_station/esp32_ground_station.ino` dosyasını aç →
 "Upload" (yükle) butonuna bas.
 
 ### Adım 2 — Gerçek LoRa üzerinden paket testi (tek komut, otomatik sayar)
