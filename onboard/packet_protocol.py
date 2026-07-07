@@ -441,8 +441,13 @@ class ImageReassembler:
             # BEGIN gelmeden CHUNK geldi — bu paketleri tut ki BEGIN gelince
             # birleştirilsin. Basitlik için drop.
             return None
+        if not (0 <= chunk_idx < sess.total):
+            return None   # bozuk index — session'ı kirletme
         sess.chunks[chunk_idx] = data
-        if len(sess.chunks) >= sess.total:
+        # len() sayacı yerine TÜM indekslerin varlığını kontrol et:
+        # duplike/bozuk chunk'ta len>=total olup eksik indeks KeyError ile
+        # alıcı thread'i çökertebiliyordu.
+        if all(i in sess.chunks for i in range(sess.total)):
             ordered = b"".join(sess.chunks[i] for i in range(sess.total))
             del self._sessions[img_seq]
             return (sess.begin_payload, ordered)

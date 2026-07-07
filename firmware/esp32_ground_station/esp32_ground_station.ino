@@ -15,13 +15,16 @@
  *   - AES-128-CCM şifreleme (KOKPIT_AES_ENABLED + NVS'te 16 byte key)
  *   - SHA-256 payload bütünlük hash
  *
- * Donanım (örnek pinout — kendi karta göre güncelle):
- *   NEO-M8N GPS : TX->GPIO25, RX->GPIO26, 9600 baud
- *   LoRa E32    : TX->GPIO27, RX->GPIO13, 9600 baud
- *                 M0->GPIO12, M1->GPIO15, AUX->GPIO2
- *   Buton       : GPIO33 (INPUT_PULLUP)
- *   Buzzer/LED  : GPIO32/17
- *   OV5640      : ESP32-CAM modülünde standart pinout (esp_camera kütüphanesi)
+ * Donanım — KOKPIT_BOARD profiline göre (aşağıda PİN TANIMLARI bölümü):
+ *   BOARD_ESP32CAM (default) — AI-Thinker ESP32-CAM tek kart:
+ *     GPS TX -> GPIO13 (9600), E32 TX -> GPIO14 / RX <- GPIO15 (9600)
+ *     E32 M0+M1 -> GND (sabit), Buton -> GPIO12<->GND, LED = GPIO4 (flaş)
+ *     Kamera dahili (OV2640/OV5640, esp_camera standart pinout)
+ *   BOARD_TTGO — TTGO T-Display + harici kamera:
+ *     GPS TX->GPIO25 RX->GPIO26, E32 TX->GPIO27 RX->GPIO13,
+ *     M0->12 M1->15 AUX->2, Buton->33, Buzzer/LED->32/17
+ *     UYARI: bu profil USE_CAMERA=1 ile pin çakışır (25/26/27/32) —
+ *     TTGO'da kamera kullanma (USE_CAMERA 0) veya ESP32-CAM profili seç.
  *
  * Kütüphaneler:
  *   - TinyGPSPlus    (Mikal Hart)
@@ -38,8 +41,24 @@
 #include "esp_mac.h"     // esp_efuse_mac_get_default() — yeni ESP-IDF'te Arduino.h ile gelmiyor
 #include "packet_protocol.h"
 
+// ----------------- KART PROFİLİ -----------------
+// BOARD_ESP32CAM : AI-Thinker ESP32-CAM tek kart (kamera dahili).
+//                  Kamera GPIO 0,5,18,19,21,22,23,25,26,27,32,34,35,36,39
+//                  pinlerini kullanır — GPS/LoRa SADECE kalan boş pinlere
+//                  bağlanabilir (2,4,12,13,14,15). TFT yok.
+// BOARD_TTGO     : TTGO T-Display + AYRI ESP32-CAM modülü (eski varsayılan).
+#define BOARD_TTGO      0
+#define BOARD_ESP32CAM  1
+#ifndef KOKPIT_BOARD
+#define KOKPIT_BOARD BOARD_ESP32CAM
+#endif
+
 // ----------------- DERLEME SEÇENEKLERİ -----------------
+#if KOKPIT_BOARD == BOARD_ESP32CAM
+#define USE_TFT 0             // ESP32-CAM'de TFT ekran yok
+#else
 #define USE_TFT 1
+#endif
 #define USE_GPS 1
 #define USE_CAMERA 1          // 0 → kameradan değil, placeholder JPEG kullan
 // #define KOKPIT_AES_ENABLED  // packet_protocol.h içinde aktifleştirilir
@@ -51,6 +70,25 @@ bool g_kokpit_ccm_ready = false;
 #endif
 
 // ----------------- PİN TANIMLARI -----------------
+// -1 = bu sinyal bağlı değil / kullanılmıyor (kod güvenle atlar).
+#if KOKPIT_BOARD == BOARD_ESP32CAM
+// AI-Thinker ESP32-CAM: kamera ile ÇAKIŞMAYAN pinler.
+//   GPS TX  → GPIO13   (ESP sadece okur; GPS RX bağlanmaz)
+//   E32 TX  → GPIO14, E32 RX ← GPIO15
+//   E32 M0, M1 → GND'ye SABİT KABLOLA (şeffaf mod), AUX boşta
+//   Buton   → GPIO12 ↔ GND (dahili pull-up; boot'ta LOW olması güvenli)
+//   Buzzer  → GPIO2 (opsiyonel), Durum LED = GPIO4 (karttaki flaş LED)
+static const int PIN_GPS_RX  = 13;
+static const int PIN_GPS_TX  = -1;   // GPS'e komut gönderilmiyor
+static const int PIN_LORA_RX = 14;
+static const int PIN_LORA_TX = 15;
+static const int PIN_LORA_M0 = -1;   // GND'ye sabit kablolu
+static const int PIN_LORA_M1 = -1;   // GND'ye sabit kablolu
+static const int PIN_LORA_AUX = -1;
+static const int PIN_BUTTON  = 12;
+static const int PIN_BUZZER  = 2;
+static const int PIN_LED     = 4;    // karttaki flaş LED
+#else
 static const int PIN_GPS_RX = 25;
 static const int PIN_GPS_TX = 26;
 static const int PIN_LORA_RX = 27;
@@ -61,6 +99,12 @@ static const int PIN_LORA_AUX = 2;
 static const int PIN_BUTTON = 33;
 static const int PIN_BUZZER = 32;
 static const int PIN_LED = 17;
+#endif
+
+#if (KOKPIT_BOARD == BOARD_TTGO) && USE_CAMERA
+#error "TTGO profilinde kamera pinleri GPS/LoRa/buzzer ile cakisir \
+(GPIO 25/26/27/32). Ya USE_CAMERA 0 yap ya da KOKPIT_BOARD BOARD_ESP32CAM sec."
+#endif
 
 // ----------------- AYARLAR -----------------
 static const uint32_t GPS_BAUD = 9600;
@@ -80,6 +124,18 @@ HardwareSerial LoraSerial(2);
 #if USE_TFT
 #include <TFT_eSPI.h>
 TFT_eSPI tft = TFT_eSPI();
+#else
+// TFT_eSPI yokken renk sabitleri tanımsız kalır — drawStatus(...) çağrıları
+// derlensin diye fallback tanımlar (değerler önemsiz, sadece Serial log var)
+#ifndef TFT_BLACK
+#define TFT_BLACK  0
+#define TFT_WHITE  1
+#define TFT_CYAN   2
+#define TFT_RED    3
+#define TFT_GREEN  4
+#define TFT_YELLOW 5
+#define TFT_ORANGE 6
+#endif
 #endif
 
 #if USE_CAMERA
@@ -154,13 +210,20 @@ const char* phaseIdToStr(uint8_t id) {
 }
 
 // ----------------- YARDIMCI -----------------
+// -1 pinlere yazmayı güvenle atlayan sarmalayıcı
+static inline void pinWrite(int pin, uint8_t val) {
+  if (pin >= 0) digitalWrite(pin, val);
+}
+
 void beep(int ms) {
-  digitalWrite(PIN_BUZZER, HIGH); digitalWrite(PIN_LED, HIGH);
+  pinWrite(PIN_BUZZER, HIGH); pinWrite(PIN_LED, HIGH);
   delay(ms);
-  digitalWrite(PIN_BUZZER, LOW); digitalWrite(PIN_LED, LOW);
+  pinWrite(PIN_BUZZER, LOW); pinWrite(PIN_LED, LOW);
 }
 
 void setLoraMode(bool config) {
+  // M0/M1 GND'ye sabit kablolanmışsa (pin=-1) modül zaten şeffaf modda
+  if (PIN_LORA_M0 < 0 || PIN_LORA_M1 < 0) return;
   digitalWrite(PIN_LORA_M0, config ? HIGH : LOW);
   digitalWrite(PIN_LORA_M1, config ? HIGH : LOW);
   delay(50);
@@ -253,12 +316,12 @@ void serviceAlarm() {
   uint32_t now = millis();
   if (now - g_lastAlarmMs >= ALARM_PERIOD_MS) {
     g_lastAlarmMs = now;
-    digitalWrite(PIN_BUZZER, HIGH);
-    digitalWrite(PIN_LED, HIGH);
+    pinWrite(PIN_BUZZER, HIGH);
+    pinWrite(PIN_LED, HIGH);
   } else if (now - g_lastAlarmMs >= 80) {
     // 80ms sonra buzzer'ı kapat (kısa beep), delay() olmadan
-    digitalWrite(PIN_BUZZER, LOW);
-    digitalWrite(PIN_LED, LOW);
+    pinWrite(PIN_BUZZER, LOW);
+    pinWrite(PIN_LED, LOW);
   }
 }
 
@@ -381,6 +444,21 @@ void sendFaceDelivery() {
   uint16_t total_chunks = (uint16_t)((jpeg_len + FACE_CHUNK_PAYLOAD - 1) /
                                      FACE_CHUNK_PAYLOAD);
   if (total_chunks == 0) total_chunks = 1;
+
+  // GUARD: paket başlığındaki chunk/total alanları uint8 — 255 chunk üstü
+  // (25.500 byte JPEG) sessizce sarar ve drone bozuk görüntü birleştirir.
+  // Frame QQVGA iken imkânsız; biri frame_size'ı büyütürse burada yakala.
+  if (total_chunks > 255 || jpeg_len > 0xFFFF) {
+    Serial.printf("[FACE] JPEG cok buyuk: %u byte / %u chunk (max 255). "
+                  "frame_size/jpeg_quality dusur.\n",
+                  (unsigned)jpeg_len, total_chunks);
+    drawStatus("JPEG COK BUYUK", "kalite dusur", TFT_RED);
+#if USE_CAMERA
+    esp_camera_fb_return(fb);
+#endif
+    beep(60); delay(80); beep(60);
+    return;
+  }
   g_img_seq++;
 
   // 1) FACE_IMAGE_BEGIN
@@ -438,11 +516,11 @@ void sendFaceDelivery() {
 void setup() {
   Serial.begin(115200);
   pinMode(PIN_BUTTON, INPUT_PULLUP);
-  pinMode(PIN_BUZZER, OUTPUT);
-  pinMode(PIN_LED, OUTPUT);
-  pinMode(PIN_LORA_M0, OUTPUT);
-  pinMode(PIN_LORA_M1, OUTPUT);
-  pinMode(PIN_LORA_AUX, INPUT);
+  if (PIN_BUZZER >= 0)   pinMode(PIN_BUZZER, OUTPUT);
+  if (PIN_LED >= 0)      pinMode(PIN_LED, OUTPUT);
+  if (PIN_LORA_M0 >= 0)  pinMode(PIN_LORA_M0, OUTPUT);
+  if (PIN_LORA_M1 >= 0)  pinMode(PIN_LORA_M1, OUTPUT);
+  if (PIN_LORA_AUX >= 0) pinMode(PIN_LORA_AUX, INPUT);
 
   GpsSerial.begin(GPS_BAUD, SERIAL_8N1, PIN_GPS_RX, PIN_GPS_TX);
   LoraSerial.begin(LORA_BAUD, SERIAL_8N1, PIN_LORA_RX, PIN_LORA_TX);
