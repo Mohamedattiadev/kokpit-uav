@@ -21,6 +21,7 @@ import math
 import os
 import threading
 import time
+from dataclasses import replace
 from typing import Optional
 
 from config import CFG
@@ -42,15 +43,24 @@ class Mission:
                  lora: Optional[BaseLoRaReceiver] = None,
                  camera=None, detector: Optional[ArucoDetector] = None,
                  verifier: Optional[FaceVerifier] = None,
-                 dropper: Optional[PackageDropper] = None):
+                 dropper: Optional[PackageDropper] = None,
+                 target: Optional[DeliveryRequest] = None):
         self.drone = drone or DroneController()
         self.lora = lora
         self.camera = camera
         self.detector = detector or ArucoDetector()
-        self.verifier = verifier or FaceVerifier()
+        # Madde 4 (görev sadeleştirme): gerçek uçuşta biyometrik doğrulama
+        # bypass'lı — kayıtlı tek alıcı kim olursa olsun PASS. Testlerdeki
+        # varsayılan FaceVerifier() (CFG.face, verification_bypassed=False)
+        # ETKİLENMEZ; sadece Mission'ın kendi kurduğu verifier bypass'lıdır.
+        self.verifier = verifier or FaceVerifier(
+            cfg=replace(CFG.face, verification_bypassed=True))
         self.dropper = dropper
         self.fsm = StateMachine()
-        self.target: Optional[DeliveryRequest] = None
+        # Madde 1 (görev sadeleştirme): hedef GPS artık LoRa/yer istasyonundan
+        # DEĞİL, bilgisayardan (target_source.py: CLI/env/yaml) verilir.
+        # target verilmişse WAIT_PACKET LoRa beklemeden direkt geçer.
+        self.target: Optional[DeliveryRequest] = target
         self.package_delivered = False   # görev boyunca kalıcı teslimat kaydı
         # Servo guard'ları için durum bayrakları
         self.face_verified: bool = False
@@ -67,6 +77,7 @@ class Mission:
         self._cancel_event = threading.Event()   # phase task cancellation
         self.watchdog = Watchdog(period_s=5.0)
         self._manual_requested = False
+        self._manual_rc_switch_prev = False   # RC6 manuel bırakma edge-trigger
 
     # =====================================================================
     # Kurulum
@@ -227,9 +238,31 @@ class Mission:
             elif t.alt_rel > s.geofence_max_alt_m + 2:
                 self._push_failsafe(self.PRIO_GEOFENCE, "GEOFENCE",
                                     f"Geofence irtifa aşıldı ({t.alt_rel:.0f}m)")
+            # 6) Kumanda (RC) manuel paket bırakma — pilot RC6 switch'ini
+            # yukarı aldığında FSM fazından bağımsız tetiklenir (irtifa+eğim
+            # guard'ı hâlâ geçerli, bkz. package_dropper.manual_release).
+            # Edge-triggered: switch düşükten yükseğe geçtiğinde bir kez.
+            self._check_manual_rc_drop(t)
             # En yüksek öncelikli failsafe'i işle
             self._consume_failsafes()
             time.sleep(0.2)
+
+    def _check_manual_rc_drop(self, t) -> None:
+        rc = getattr(t, "rc_channels", None)
+        if not rc or self.dropper is None:
+            return
+        pwm = rc.get(CFG.dropper.manual_rc_channel)
+        if pwm is None:
+            return
+        switch_on = pwm >= CFG.dropper.manual_rc_pwm_threshold
+        if switch_on and not self._manual_rc_switch_prev and not self.dropper.dropped:
+            print(f"[GÖREV] Manuel RC{CFG.dropper.manual_rc_channel} tetiklendi "
+                  f"(pwm={pwm}) — servo bırakılıyor")
+            try:
+                self.dropper.manual_release()
+            except Exception as e:
+                print(f"[GÖREV] Manuel RC bırakma hatası: {e}")
+        self._manual_rc_switch_prev = switch_on
 
     def _push_failsafe(self, priority: int, kind: str, reason: str):
         with self._failsafe_lock:
@@ -349,7 +382,20 @@ class Mission:
     # Durum eylemleri
     # =====================================================================
     def _do_wait_packet(self):
-        print("[GÖREV] Yer istasyonundan teslimat talebi bekleniyor...")
+        # Madde 1+2 (görev sadeleştirme): hedef GPS artık bilgisayardan
+        # (target_source.py) doğrudan verilir. main() gerçek uçuşta target
+        # verilmeden Mission'ı hiç kurmaz (bkz. aşağıdaki main()) — bu yüzden
+        # bu dal gerçek uçuşta HER ZAMAN buradan hemen geçer.
+        if self.target is not None:
+            print(f"[GÖREV] Hedef GPS (bilgisayardan verildi — madde 1): "
+                  f"({self.target.lat:.6f}, {self.target.lon:.6f})")
+            self.fsm.transition(MissionState.TAKEOFF)
+            return
+        # Geriye dönük/test yolu: target verilmemişse LoRa'dan bekle. Gerçek
+        # uçuşta yer istasyonu artık göstermelik (madde 2) ve hiç paket
+        # göndermez — bu dal SADECE testlerde/sim enjeksiyonunda kullanılır.
+        print("[GÖREV] Hedef verilmedi — LoRa'dan teslimat talebi bekleniyor "
+              "(yalnızca test/sim yolu — gerçek uçuşta kullanılmaz)...")
         item = self.lora.wait_for_delivery(timeout=None)
         if item is None:
             self.fsm.transition(MissionState.FAILED, force=True)
@@ -598,7 +644,17 @@ class Mission:
 
 
 def main():
-    m = Mission()
+    import target_source
+    args = target_source.build_arg_parser().parse_args()
+    try:
+        target = target_source.resolve_target(args)
+    except RuntimeError as e:
+        if not CFG.simulation:
+            # Madde 1: gerçek uçuşta hedefsiz kalkış YAPILMAMALI — sert hata.
+            raise
+        print(f"[GÖREV] {e} (SIMULATION modunda devam — LoRa enjeksiyonu bekleniyor)")
+        target = None
+    m = Mission(target=target)
     try:
         m.setup()
         m.run()
