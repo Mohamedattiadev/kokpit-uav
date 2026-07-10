@@ -92,6 +92,18 @@ class PackageDropper:
         if tilt_deg > 15:
             raise GuardFailure(f"tilt guard — eğim {tilt_deg:.0f}° > 15°")
 
+    def manual_release(self) -> bool:
+        """Pilot RC anahtarıyla (RC6) manuel bırakma.
+
+        FSM faz/yüz/marker guard'larını atlar — pilot görsel olarak karar
+        veriyor, otomatik akışta olmasına gerek yok (güvenlik/override
+        senaryosu). İrtifa + eğim guard'ları KORUNUR (fiziksel güvenlik,
+        atlanamaz). Gerekçe: docs/BAGLANTI_VE_DURUM.md."""
+        if self.dropped:
+            return True
+        print("[DROP] MANUEL tetikleme (RC6 switch) — pilot kararı")
+        return self.drop(phase_ok=True, face_verified=True, marker_locked=True)
+
     def reset(self):
         """Mekanizmayı tekrar kilitli konuma al (sonraki görev için)."""
         self.lock()

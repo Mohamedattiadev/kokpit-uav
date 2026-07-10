@@ -74,6 +74,8 @@ class Telemetry:
     pitch: float = 0.0
     yaw: float = 0.0
     accel_z_g: float = 1.0          # g cinsinden dikey ivme, crash detection
+    # RC kanalları (1-tabanlı -> pwm us). Manuel servo tetikleme (RC6) için.
+    rc_channels: dict = field(default_factory=dict)
 
 
 class DroneController:
@@ -145,6 +147,7 @@ class DroneController:
             mavutil.mavlink.MAVLINK_MSG_ID_EKF_STATUS_REPORT: 2,
             mavutil.mavlink.MAVLINK_MSG_ID_HOME_POSITION: 1,
             mavutil.mavlink.MAVLINK_MSG_ID_SYSTEM_TIME: 1,
+            mavutil.mavlink.MAVLINK_MSG_ID_RC_CHANNELS: 5,
         }
         for msg_id, hz in rates_hz.items():
             interval_us = int(1_000_000 / hz)
@@ -228,6 +231,10 @@ class DroneController:
             elif t == "RAW_IMU":
                 # Accel m/s² (mg → g cinsi için 1000'e böl); crash detection için
                 self.tel.accel_z_g = msg.zacc / 1000.0
+            elif t == "RC_CHANNELS":
+                self.tel.rc_channels = {
+                    i: getattr(msg, f"chan{i}_raw", 0) for i in range(1, 9)
+                }
             elif t == "HOME_POSITION":
                 self.home_lat = msg.latitude / 1e7
                 self.home_lon = msg.longitude / 1e7
