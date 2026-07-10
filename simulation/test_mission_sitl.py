@@ -2,8 +2,13 @@
 test_mission_sitl.py — Görevi GERÇEK ArduPilot SITL'e karşı çalıştırır.
 
 Bu, yazılım-içi fizik testinden (tests/test_mission_integration.py) bir adım
-ötesidir: MAVLink komutları GERÇEK ArduCopter SITL fiziğine gönderilir; görüş
-(ArUco) ve LoRa simüle edilir. Yani uçuş kontrol davranışı gerçekçidir.
+ötesidir: MAVLink komutları GERÇEK ArduCopter SITL fiziğine gönderilir; sadece
+görüş (ArUco) simüle edilir. Yani uçuş kontrol davranışı gerçekçidir.
+
+Görev sadeleştirme oturumu (madde 1+2+4) güncellemesi: hedef artık LoRa
+enjeksiyonu yerine doğrudan Mission(target=...) ile veriliyor; biyometrik
+doğrulama Mission'ın varsayılan bypass'lı FaceVerifier'ı üzerinden geçiyor
+(StubVerifier'a gerek kalmadı — gerçek üretim kod yolu test ediliyor).
 
 ÖN KOŞUL: Başka bir terminalde SITL çalışıyor olmalı:
     ./run_sitl.sh
@@ -11,7 +16,7 @@ Sonra:
     KOKPIT_SIM=1 python3 test_mission_sitl.py
 
 Akış: SITL'e bağlan -> home'u oku -> 20 m kuzeye sanal marker/ped koy ->
-teslimat paketini enjekte et -> görevi çalıştır -> sonuçları raporla.
+hedefi Mission'a doğrudan ver -> görevi çalıştır -> sonuçları raporla.
 """
 import os
 import sys
@@ -22,28 +27,11 @@ os.environ.setdefault("KOKPIT_SIM", "1")
 
 from config import CFG                       # noqa: E402
 from mavlink_interface import DroneController  # noqa: E402
-from lora_receiver import SimLoRaReceiver    # noqa: E402
 from aruco_detector import ArucoDetector     # noqa: E402
 from package_dropper import PackageDropper   # noqa: E402
-from face_verifier import VerifyResult       # noqa: E402
 from packet_protocol import DeliveryRequest  # noqa: E402
 from mission import Mission                  # noqa: E402
 from sim_backend import SimDownCamera        # noqa: E402
-
-
-class StubVerifier:
-    def __init__(self, result=True):
-        self.result = result
-        self.enrolled = [7]
-
-    def load_dataset(self, directory=None):
-        return 1
-
-    def verify_with_voting(self, recipient_id, camera, on_frame=None):
-        for _ in range(3):
-            camera.read()
-        return VerifyResult(matched=self.result, confidence=0.95,
-                            face_found=True, recipient_id=recipient_id)
 
 
 def main():
@@ -76,15 +64,14 @@ def main():
     mlat = home_lat + 20.0 / 111320.0   # 20 m kuzey
     mlon = home_lon
     cam = SimDownCamera(drone, mlat, mlon, marker_len_m=CFG.aruco.marker_length_m)
-    lora = SimLoRaReceiver()
+    # Madde 1: hedef bilgisayardan doğrudan verilir (LoRa YOK).
+    target = DeliveryRequest(lat=mlat, lon=mlon, alt=t.alt_amsl,
+                             recipient_id=0, gps_fix=3, num_sats=14)
 
-    m = Mission(drone=drone, lora=lora, camera=cam,
-                detector=ArucoDetector(), verifier=StubVerifier(True),
-                dropper=PackageDropper(drone))
+    m = Mission(drone=drone, lora=None, camera=cam,
+                detector=ArucoDetector(), dropper=PackageDropper(drone),
+                target=target)
     m.setup()
-    lora.inject_delivery(DeliveryRequest(
-        lat=mlat, lon=mlon, alt=t.alt_amsl, recipient_id=7,
-        gps_fix=3, num_sats=14))
 
     ok = False
     try:

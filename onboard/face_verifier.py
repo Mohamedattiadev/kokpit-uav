@@ -343,6 +343,22 @@ class FaceVerifier:
     def verify_with_voting(self, recipient_id: int, camera,
                            on_frame=None) -> VerifyResult:
         """Birden çok kare topla, oyla. votes_needed_to_pass eşleşme -> PASS."""
+        if self.cfg.verification_bypassed:
+            # KASITLI: yarışma günü basitleştirme kararı (madde 4) —
+            # biyometrik doğrulama devre dışı bırakıldı. Kayıtlı tek alıcı
+            # kim olursa olsun kamerada görülen HERHANGİ bir yüz PASS
+            # sayılır. BUG DEĞİLDİR — geri almadan önce takıma sor.
+            try:
+                ok, frame = camera.read()
+            except Exception:
+                ok, frame = False, None
+            res = VerifyResult(matched=True, confidence=1.0, distance=0.0,
+                               face_found=True, recipient_id=recipient_id)
+            if on_frame and ok:
+                on_frame(frame, res)
+            print(f"[YÜZ] BYPASS (madde 4 — yarışma günü basitleştirme): "
+                  f"alıcı {recipient_id} otomatik PASS")
+            return res
         votes = 0
         checked = 0
         best = VerifyResult(recipient_id=recipient_id)

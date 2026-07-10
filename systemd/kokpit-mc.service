@@ -12,6 +12,12 @@ Environment=PYTHONUNBUFFERED=1
 # N8 — dashboard auth: kurulum öncesi /etc/kokpit/dash_pw dosyası oluştur
 # (`scripts/gen_dash_pw.sh`). Boşsa servis 0.0.0.0 bind reddeder.
 EnvironmentFile=-/etc/kokpit/dash_pw
+# Madde 1 (görev sadeleştirme) — hedef GPS artık yer istasyonundan değil bu
+# dosyadan gelir: KOKPIT_TARGET_LAT=... / KOKPIT_TARGET_LON=... satırları.
+# Uçuş öncesi düzenle, sonra `sudo systemctl restart kokpit-mc` (bkz.
+# docs/BAGLANTI_VE_DURUM.md). Dosya yoksa (henüz oluşturulmadıysa) servis
+# hedefsiz kalkışı REDDEDER (bilinçli sert hata).
+EnvironmentFile=-/etc/kokpit/target_gps
 ExecStart=/home/jetson/Teknofest/.venv/bin/python3 -m onboard.mission
 Restart=on-failure
 RestartSec=3

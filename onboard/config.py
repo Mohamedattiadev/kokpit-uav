@@ -58,7 +58,14 @@ class LinkConfig:
 # =============================================================================
 @dataclass
 class CameraConfig:
-    # Alt kamera (ArUco / hassas iniş) — WaveShare IMX219 CSI
+    # Alt kamera (ArUco / hassas iniş) — Arducam 12MP IMX708 Fixed Focus HDR CSI
+    # (görev sadeleştirme oturumu düzeltmesi: önceden burada yanlışlıkla
+    # WaveShare IMX219 yazıyordu — ekipten gelen kesin bilgiye göre gerçek
+    # sensör IMX708. nvarguscamerasrc bu çözünürlük/fps'i IMX708 mod tablosundan
+    # otomatik seçer; SAHADA `gst-launch-1.0 nvarguscamerasrc sensor-id=0 !
+    # 'video/x-raw(memory:NVMM),width=1280,height=720' ! nvvidconv ! xvimagesink`
+    # ile görüntü geldiğini DOĞRULA — IMX708 device tree/driver Jetson'da farklı
+    # olabilir.)
     width: int = 1280
     height: int = 720
     fps: int = 30
@@ -69,8 +76,12 @@ class CameraConfig:
     sensor_id: int = 0
 
     # Kamera iç parametreleri (kalibrasyon). camera_calibration.npz varsa oradan
-    # yüklenir; yoksa bu varsayılanlar (IMX219 ~ 1280x720) kullanılır.
-    # SAHADA mutlaka gerçek kalibrasyon yap (tools/calibrate_camera.py).
+    # yüklenir; yoksa bu varsayılanlar kullanılır.
+    # DİKKAT: Bu fx/fy/cx/cy değerleri ESKİ IMX219 kamerası içindi. Gerçek
+    # kamera IMX708 (farklı sensör/lens) olduğu için bu değerler YANLIŞ —
+    # ArUco mesafe tahmini bunlara dayanır. SAHA ÖNCESİ MUTLAKA
+    # `tools/calibrate_camera.py` ile IMX708 için yeniden kalibre et
+    # (bkz. docs/BAGLANTI_VE_DURUM.md).
     fx: float = 1000.0
     fy: float = 1000.0
     cx: float = 640.0
@@ -159,6 +170,12 @@ class FaceConfig:
     votes_required: int = 5             # kaç karede eşleşme aranacak
     votes_needed_to_pass: int = 3       # bunlardan kaçı eşleşirse "PASS"
     verify_timeout_s: float = 12.0      # doğrulama için maksimum süre
+    # KASITLI (madde 4 — görev sadeleştirme, yarışma günü kararı): False iken
+    # normal eşleştirme mantığı çalışır (birim testlerde kullanılan varsayılan
+    # budur). mission.py kendi FaceVerifier'ını True ile kurar — tek kayıtlı
+    # alıcı kim olursa olsun kamerada görülen HERHANGİ bir yüz PASS sayılır.
+    # BUG DEĞİLDİR — geri almadan önce takıma sor.
+    verification_bypassed: bool = False
 
 
 # =============================================================================
@@ -175,6 +192,16 @@ class DropperConfig:
     min_drop_altitude_m: float = 1.0   # bu seviyenin altında bırakma yasak
     max_drop_altitude_m: float = 3.5   # bu seviyenin üstünde bırakma yasak
                                        # (drop_altitude=2.5 + 1.0 buffer)
+
+    # --- Kumanda (RC) manuel tetikleme (yeni istek — güvenlik/override) ---
+    # Pilot, otomatik bırakma dışında RC6 switch'iyle de servoyu elle
+    # tetikleyebilir. Tasarım kararı + gerekçesi docs/BAGLANTI_VE_DURUM.md'de.
+    # RC7 = MOTOR KILL, RC8 = pilot mod override için ayrılmış (bkz.
+    # DONANIM_DURUM.md); RC6 bu görev sadeleştirme kararıyla manuel bırakmaya
+    # tahsis edildi (DONANIM_DURUM.md'deki "gerekirse RC6'ya AUTOTUNE ata"
+    # önerisi artık GEÇERSİZ — autotune gerekirse RC10 kullanılmalı).
+    manual_rc_channel: int = 6
+    manual_rc_pwm_threshold: int = 1700   # bu PWM'in üstü = switch AÇIK
 
 
 # =============================================================================

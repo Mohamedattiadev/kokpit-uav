@@ -1,7 +1,25 @@
-# Benewake TFS20 lidar — MAVLink rangefinder (Jetson aracılığıyla)
-# Jetson DISTANCE_SENSOR mesajı gönderir; ArduCopter rangefinder olarak kullanır.
-RNGFND1_TYPE,10
+# Benewake TFS20-L lidar — Pixhawk SERIAL4'e DOĞRUDAN bağlı (native seri protokol)
+#
+# DÜZELTME (görev sadeleştirme oturumu): Bu dosya önceden lidar'ın Jetson
+# üzerinden MAVLink DISTANCE_SENSOR mesajıyla geldiğini varsayıyordu
+# (RNGFND1_TYPE=10). Ekipten (Enes, Attia) gelen kesin bilgiye göre lidar
+# Pixhawk SERIAL4/5'e DOĞRUDAN seri kabloyla bağlı — Jetson araya girmiyor.
+# Not: Jetson tarafındaki kod (onboard/mavlink_interface.py) zaten hiç
+# DISTANCE_SENSOR göndermiyordu (kontrol edildi) — bu param dosyası dışında
+# değişiklik gerekmedi; ArduCopter, sensörün kaynağı ne olursa olsun ölçümü
+# RANGEFINDER mesajıyla Jetson'a yayınlar, Jetson tarafı bunu zaten dinliyor.
+#
+# Kaynak: ardupilot.org/copter/docs/common-benewake-tf02-lidar.html — TFS20-L,
+# "BenewakeTF03" ailesiyle (TF02-Pro/TF03/TFS20-L/TF-Luna/TF-Nova/TF350) aynı
+# RNGFND_TYPE=27 kodunu kullanıyor. SERIALx_PROTOCOL=9 (Lidar), baud=115200.
+#
+# AÇIK SORU: Fiziksel port SERIAL4 mü SERIAL5 mi KESİNLEŞMEDİ — bu dosya
+# SERIAL4 varsayıyor. Lidar gerçekte SERIAL5'e takılıysa SERIAL4_* satırlarını
+# SERIAL5_* olarak değiştir (bkz. docs/BAGLANTI_VE_DURUM.md açık soru).
+SERIAL4_PROTOCOL,9
+SERIAL4_BAUD,115
+RNGFND1_TYPE,27
 RNGFND1_ORIENT,25
-RNGFND1_MIN_CM,10
+RNGFND1_MIN_CM,20
 RNGFND1_MAX_CM,1500
 RNGFND1_GNDCLEAR,15
